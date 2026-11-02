@@ -2,8 +2,9 @@
 
 A two-player pen-and-paper racing game, playable hot-seat on one phone or
 tablet. Based on the classic paper game where each player draws one quick
-stroke per turn to move their car along a winding track — cross a wall and
-you crash, cross the finish line first and you win.
+stroke per turn to move their car around a closed circuit shaped like the
+modern Automotodrom Brno. Cross a wall and you crash; complete one clockwise
+lap and cross the finish line first to win.
 
 Single-file prototype: one `index.html` with inline CSS/JS, HTML5 canvas,
 no frameworks, no build step.
@@ -20,8 +21,11 @@ no frameworks, no build step.
   the turn passes to the other player. Your next stroke starts from the
   crash point.
 - Stay inside the track and the turn simply passes after your stroke ends.
-- First player to cross the checkered finish line while still inside the
-  track wins. Tap **Rematch** to play again.
+- Follow the arrows clockwise around the entire circuit. The green start
+  zone sits just before the shared start/finish line. Crossing it at the
+  beginning does not win; you must complete a full lap first.
+- First player to finish the lap wins. Going backwards across a lap gate
+  clears lap progress. Tap **Rematch** to play again.
 
 ## Running locally
 
@@ -43,8 +47,16 @@ node --test tests/collision.test.cjs
 ```
 
 These tests run the game's input handlers with a canvas stub and cover wall
-collisions, recovery after a crash, shortcuts, and finish crossings in portrait
-and landscape layouts. No dependencies are required.
+collisions, recovery after a crash, shortcuts, closed-wall geometry, and complete
+laps in portrait and landscape layouts. No dependencies are required.
+
+## Brno circuit
+
+The hand-placed outline is a simplified interpretation of the modern circuit
+in the [official Automotodrom Brno map](https://www.automotodrombrno.cz/content/uploads/2019/07/CzechGP-mapa.pdf).
+Its proportions are preserved, with a wider road for finger drawing. On portrait
+screens the whole plan rotates to use the available space. The map is a reference;
+the game loads no external assets or map services.
 
 ## Deploying to GitHub Pages
 
@@ -68,14 +80,14 @@ To enable it on GitHub:
   `WAITING_FOR_TOUCH` / `GAME_OVER`.
 - **Geometry helpers** — segment intersection, point-in-polygon,
   Catmull-Rom spline interpolation.
-- **Track generation** — builds a smooth track corridor (with a start
-  zone and checkered finish) from a hand-placed centerline, adapting to
-  portrait or landscape viewports.
+- **Track generation** — smooths a cyclic Brno centerline, samples it at
+  uniform distances, and builds closed inner/outer walls, a green grid,
+  and a shared start/finish stripe. The infield stays outside the road.
 - **Rendering** — a pre-rendered static track layer plus per-frame
   strokes, crash markers, and the stroke time indicator.
 - **Input handling** — Pointer Events unify touch and mouse.
-- **Game logic** — turn handling, crash/win detection, reset/rematch.
+- **Game logic** — turn handling, crash detection, three ordered directional
+  checkpoints per player, full-lap finish detection, and reset/rematch.
 
-Only one track is hardcoded for this prototype, but since it's generated
-from a centerline + width profile, adding more tracks later just means
-adding more centerline/width data.
+The prototype has one circuit. Its outline is defined by `BRNO_ANCHORS` in
+`index.html`; changing the anchors changes the shape of the closed lap.
