@@ -162,6 +162,16 @@
     return Math.hypot(a.x - b.x, a.y - b.y);
   }
 
+  const GEOMETRY_EPSILON = 1e-7; // floating-point tolerance, in CSS pixels
+
+  function pointOnSegment(pt, p1, p2) {
+    const dx = p2.x - p1.x, dy = p2.y - p1.y;
+    const lengthSquared = dx * dx + dy * dy;
+    if (lengthSquared === 0) return dist(pt, p1) <= GEOMETRY_EPSILON;
+    const t = clamp(((pt.x - p1.x) * dx + (pt.y - p1.y) * dy) / lengthSquared, 0, 1);
+    return dist(pt, { x: p1.x + t * dx, y: p1.y + t * dy }) <= GEOMETRY_EPSILON;
+  }
+
   // Catmull-Rom spline interpolation of a single scalar component.
   function catmullRom(p0, p1, p2, p3, t) {
     const t2 = t * t, t3 = t2 * t;
@@ -199,20 +209,28 @@
     return inside;
   }
 
-  // Finds the nearest intersection (smallest t) of segment p1->p2 against a
-  // list of {p1,p2,type} candidate segments. When ignoreNearStart is set,
-  // hits that land right on top of p1 are skipped -- this is only needed for
-  // a stroke's very first segment, where p1 may sit exactly on a wall (e.g.
-  // resuming from a crash point). Applying it to every segment would also
-  // suppress genuine crossings during a slow stroke, whose segments are only
-  // a pixel or two long, so callers must opt in per segment.
-  function findNearestIntersection(p1, p2, segments, ignoreNearStart) {
+  // A car on a wall may leave it only toward the road. Test the interval
+  // before the next intersection so a later exit is still detected, even
+  // when the stroke's endpoint is back inside the winding track.
+  function findNearestIntersection(p1, p2, segments, roadPolygon) {
     let best = null;
+    let originWall = null;
     for (const seg of segments) {
+      if (seg.type === "wall" && pointOnSegment(p1, seg.p1, seg.p2)) {
+        // Check the origin explicitly: roundoff at a stored crash point can
+        // otherwise put its intersection just outside segIntersect's range.
+        originWall = { x: p1.x, y: p1.y, t: 0, type: "wall" };
+        continue;
+      }
       const hit = segIntersect(p1, p2, seg.p1, seg.p2);
       if (!hit) continue;
-      if (ignoreNearStart && dist(hit, p1) < 2.5) continue; // ignore self-hit at the stroke's origin
       if (!best || hit.t < best.t) best = { x: hit.x, y: hit.y, t: hit.t, type: seg.type };
+    }
+    if (originWall) {
+      const t = (best ? best.t : 1) / 2;
+      const probe = { x: p1.x + (p2.x - p1.x) * t, y: p1.y + (p2.y - p1.y) * t };
+      const onWall = segments.some(seg => seg.type === "wall" && pointOnSegment(probe, seg.p1, seg.p2));
+      if (onWall || !pointInPolygon(probe, roadPolygon)) return originWall;
     }
     return best;
   }
@@ -311,7 +329,9 @@
       wallSegments.push({ p1: right[i], p2: right[i + 1], type: "wall" });
     }
 
+    const startSegment = { p1: left[0], p2: right[0], type: "wall" };
     const finishSegment = { p1: left[len - 1], p2: right[len - 1], type: "finish" };
+    const roadPolygon = left.concat(right.slice().reverse());
 
     const boundsSegments = [
       { p1: { x: 0, y: 0 }, p2: { x: width, y: 0 }, type: "bounds" },
@@ -332,8 +352,8 @@
       width, height, minDim,
       centerline, left, right,
       wallSegments, finishSegment, boundsSegments,
-      startZonePolygon, finishBandPolygon,
-      collisionSegments: wallSegments.concat([finishSegment], boundsSegments),
+      roadPolygon, startZonePolygon, finishBandPolygon,
+      collisionSegments: wallSegments.concat([startSegment, finishSegment], boundsSegments),
       startPoint: centerline[0],
     };
   }
@@ -354,8 +374,7 @@
     sctx.fillRect(0, 0, W, H);
 
     // road corridor
-    const corridor = track.left.concat(track.right.slice().reverse());
-    drawPolygonPath(sctx, corridor);
+    drawPolygonPath(sctx, track.roadPolygon);
     sctx.fillStyle = "#dbeafe";
     sctx.fill();
 
@@ -391,6 +410,8 @@
     drawLinePath(sctx, track.left);
     sctx.stroke();
     drawLinePath(sctx, track.right);
+    sctx.stroke();
+    drawLinePath(sctx, [track.left[0], track.right[0]]);
     sctx.stroke();
 
     // labels
@@ -543,9 +564,9 @@
     const pos = getRelativePos(e);
     const stroke = game.currentStroke;
     const from = stroke.points[stroke.points.length - 1];
-    const isFirstSegment = stroke.points.length === 1;
+    if (dist(from, pos) <= GEOMETRY_EPSILON) return;
 
-    const hit = findNearestIntersection(from, pos, track.collisionSegments, isFirstSegment);
+    const hit = findNearestIntersection(from, pos, track.collisionSegments, track.roadPolygon);
     if (hit) {
       stroke.points.push({ x: hit.x, y: hit.y });
       endStroke(hit.type === "finish" ? "win" : "crash");
