@@ -105,6 +105,7 @@
     <button id="rematchBtn">Rematch</button>
   </div>
 
+<script src="vendor/clipper.js"></script>
 <script>
 (function () {
   "use strict";
@@ -214,8 +215,8 @@
   }
 
   function pointInRoad(pt, road) {
-    // Two separate closed walls form a ring. Its infield is not driveable.
-    return pointInPolygon(pt, road.left) !== pointInPolygon(pt, road.right);
+    // Offset contours bound the road and exclude the infield.
+    return road.boundaryPolygons.reduce((inside, polygon) => inside !== pointInPolygon(pt, polygon), false);
   }
 
   // A car on a wall may leave it only toward the road. Test the interval
@@ -273,9 +274,9 @@
   ];
 
   const TRACK_SAMPLES = 360;
-  const TRACK_HALF_WIDTH = 28; // plan units; widened for finger drawing
+  const TRACK_HALF_WIDTH = 64; // more than twice the previous visible width after fitting
 
-  function generateTrack(width, height) {
+  function generateTrack(width, height, halfWidth = TRACK_HALF_WIDTH) {
     const minDim = Math.min(width, height);
     const portrait = height >= width;
     const margin = minDim * 0.065;
@@ -310,18 +311,42 @@
       plan.push(portrait ? { x: -y, y: x } : { x, y });
     }
     const xs = plan.map(p => p.x), ys = plan.map(p => p.y);
-    const minX = Math.min(...xs) - TRACK_HALF_WIDTH;
-    const maxX = Math.max(...xs) + TRACK_HALF_WIDTH;
-    const minY = Math.min(...ys) - TRACK_HALF_WIDTH;
-    const maxY = Math.max(...ys) + TRACK_HALF_WIDTH;
+    const minX = Math.min(...xs) - halfWidth;
+    const maxX = Math.max(...xs) + halfWidth;
+    const minY = Math.min(...ys) - halfWidth;
+    const maxY = Math.max(...ys) + halfWidth;
     const scale = Math.min((width - 2 * margin) / (maxX - minX), (height - 2 * margin) / (maxY - minY));
     const centerline = plan.map(p => ({
       x: width / 2 + (p.x - (minX + maxX) / 2) * scale,
       y: height / 2 + (p.y - (minY + maxY) / 2) * scale,
-      w: TRACK_HALF_WIDTH * scale,
+      w: halfWidth * scale,
     }));
-    const left = [], right = [];
+
+    // A plain normal offset folds over itself when the road is wider than
+    // a corner's radius. Polygon offsets trim those folds into real, closed
+    // walls while keeping the original Brno centerline intact.
+    const precision = 100000;
+    const path = centerline.map(p => ({ X: Math.round(p.x * precision), Y: Math.round(p.y * precision) }));
+    if (!ClipperLib.Clipper.Orientation(path)) path.reverse();
+    function offset(distance) {
+      const engine = new ClipperLib.ClipperOffset(2, 0.1 * precision);
+      engine.AddPath(path, ClipperLib.JoinType.jtRound, ClipperLib.EndType.etClosedPolygon);
+      const polygons = new ClipperLib.Paths();
+      engine.Execute(polygons, distance * precision);
+      return polygons.map(polygon => polygon.map(p => ({ x: p.X / precision, y: p.Y / precision })));
+    }
+    const boundaryPolygons = offset(halfWidth * scale).concat(offset(-halfWidth * scale));
+    const wallSegments = [];
+    for (const polygon of boundaryPolygons) {
+      for (let i = 0; i < polygon.length; i++) {
+        wallSegments.push({ p1: polygon[i], p2: polygon[(i + 1) % polygon.length], type: "wall" });
+      }
+    }
+
+    // Cross-sections for the grid, stripe and lap gates use the actual walls,
+    // including the wider inside of a trimmed hairpin.
     const len = centerline.length;
+    const left = [], right = [];
     for (let i = 0; i < len; i++) {
       const prev = centerline[(i + len - 1) % len];
       const next = centerline[(i + 1) % len];
@@ -330,15 +355,11 @@
       tx /= tl; ty /= tl;
       const nx = -ty, ny = tx; // perpendicular normal
       const p = centerline[i];
-      left.push({ x: p.x + nx * p.w, y: p.y + ny * p.w });
-      right.push({ x: p.x - nx * p.w, y: p.y - ny * p.w });
-    }
-
-    // Build wall segment lists for collision testing.
-    const wallSegments = [];
-    for (let i = 0; i < len; i++) {
-      wallSegments.push({ p1: left[i], p2: left[(i + 1) % len], type: "wall" });
-      wallSegments.push({ p1: right[i], p2: right[(i + 1) % len], type: "wall" });
+      for (const [sign, side] of [[1, left], [-1, right]]) {
+        const target = { x: p.x + sign * nx * minDim * 4, y: p.y + sign * ny * minDim * 4 };
+        const hit = findNearestIntersection(p, target, wallSegments, { boundaryPolygons });
+        side.push({ x: hit.x, y: hit.y });
+      }
     }
 
     function makeGate(index, type, checkpoint = null) {
@@ -348,7 +369,9 @@
         forward: { x: after.x - before.x, y: after.y - before.y } };
     }
     const finishSegment = makeGate(0, "finish");
-    const checkpoints = [0.25, 0.5, 0.75].map((fraction, i) => makeGate(Math.round(len * fraction), "checkpoint", i));
+    // Keep the last gate on the return straight: at the old 75% position
+    // the wider cross-section would also intersect the approaching bend.
+    const checkpoints = [0.25, 0.5, 0.8].map((fraction, i) => makeGate(Math.round(len * fraction), "checkpoint", i));
     const lapGates = checkpoints.concat([finishSegment]);
 
     const boundsSegments = [
@@ -367,7 +390,7 @@
 
     return {
       width, height, minDim,
-      centerline, left, right,
+      centerline, left, right, boundaryPolygons,
       wallSegments, finishSegment, checkpoints, lapGates, boundsSegments,
       startZonePolygon, finishBandPolygon,
       collisionSegments: wallSegments.concat(boundsSegments),
@@ -391,8 +414,7 @@
     sctx.fillRect(0, 0, W, H);
 
     // road corridor
-    drawPolygonPath(sctx, track.left);
-    drawPolygonPath(sctx, track.right, false);
+    track.boundaryPolygons.forEach((polygon, i) => drawPolygonPath(sctx, polygon, i === 0));
     sctx.fillStyle = "#dbeafe";
     sctx.fill("evenodd");
 
@@ -425,10 +447,10 @@
     sctx.lineCap = "round";
     sctx.lineJoin = "round";
     sctx.strokeStyle = "#0f172a";
-    drawPolygonPath(sctx, track.left);
-    sctx.stroke();
-    drawPolygonPath(sctx, track.right);
-    sctx.stroke();
+    for (const polygon of track.boundaryPolygons) {
+      drawPolygonPath(sctx, polygon);
+      sctx.stroke();
+    }
 
     // Direction arrows follow the clockwise lap, including in portrait.
     sctx.strokeStyle = "#64748b";

@@ -6,8 +6,8 @@ stroke per turn to move their car around a closed circuit shaped like the
 modern Automotodrom Brno. Cross a wall and you crash; complete one clockwise
 lap and cross the finish line first to win.
 
-Single-file prototype: one `index.html` with inline CSS/JS, HTML5 canvas,
-no frameworks, no build step.
+Buildless prototype: `index.html` with inline CSS/JS, HTML5 canvas, and a
+vendored polygon-offset helper. No frameworks or installation step.
 
 ## How to play
 
@@ -47,16 +47,25 @@ node --test tests/collision.test.cjs
 ```
 
 These tests run the game's input handlers with a canvas stub and cover wall
-collisions, recovery after a crash, shortcuts, closed-wall geometry, and complete
-laps in portrait and landscape layouts. No dependencies are required.
+collisions, recovery after a crash, shortcuts, closed-wall geometry, visible road
+width, unique lap gates, and complete laps in portrait and landscape layouts.
+No dependency installation is required.
 
 ## Brno circuit
 
 The hand-placed outline is a simplified interpretation of the modern circuit
 in the [official Automotodrom Brno map](https://www.automotodrombrno.cz/content/uploads/2019/07/CzechGP-mapa.pdf).
-Its proportions are preserved, with a wider road for finger drawing. On portrait
-screens the whole plan rotates to use the available space. The map is a reference;
-the game loads no external assets or map services.
+Its centerline and proportions are preserved, with a wider road for finger
+drawing. The current road is at least twice as wide on screen as the previous
+28-unit half-width version, including after fitting it to the viewport.
+On portrait screens the whole plan rotates to use the available space.
+
+Wide hairpins need polygon offsets rather than simple normal offsets, which
+would make the walls fold over themselves. `vendor/clipper.js` (Clipper 6.4.2.2)
+trims those folds into closed contours; rendering and collision checks use the
+same contours. Its original notices and licenses are retained in `vendor/`.
+The library is served locally with the game; no third-party CDN or map service
+is contacted at runtime.
 
 ## Deploying to GitHub Pages
 
