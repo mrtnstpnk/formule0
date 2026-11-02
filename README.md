@@ -34,6 +34,18 @@ python3 -m http.server 8000
 Then open `http://localhost:8000` in a browser. Works with touch on
 phones/tablets and with a mouse for desktop testing.
 
+## Collision regression tests
+
+With Node.js installed, run:
+
+```bash
+node --test tests/collision.test.cjs
+```
+
+These tests run the game's input handlers with a canvas stub and cover wall
+collisions, recovery after a crash, shortcuts, and finish crossings in portrait
+and landscape layouts. No dependencies are required.
+
 ## Deploying to GitHub Pages
 
 A workflow at [`.github/workflows/deploy.yml`](.github/workflows/deploy.yml)
