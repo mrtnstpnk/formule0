@@ -91,3 +91,9 @@ To enable it on GitHub:
 
 The prototype has one circuit. Its outline is defined by `BRNO_ANCHORS` in
 `index.html`; changing the anchors changes the shape of the closed lap.
+
+## Track design preview
+
+[Brno turns 1–9](previews/brno-turns-1-9.html) shows the proposed one-sided
+widening from 40 to 80 relative units and the revised connecting straights.
+Toggle the original centerline to compare the layouts.
