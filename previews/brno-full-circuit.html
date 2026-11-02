@@ -1,0 +1,27 @@
+<!doctype html>
+<html lang="cs">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Brno · návrh celého okruhu</title>
+  <style>
+    * { box-sizing:border-box; }
+    body { margin:0; background:#f8fafc; color:#334155; font-family:system-ui,-apple-system,sans-serif; }
+    main { max-width:1440px; margin:auto; padding:20px 24px; }
+    .controls { display:flex; align-items:center; justify-content:space-between; gap:16px; font-size:14px; }
+    label { display:flex; align-items:center; gap:8px; cursor:pointer; }
+    input { accent-color:#087f72; width:18px; height:18px; }
+    #diagram svg { display:block; width:100%; height:auto; }
+    footer { font-size:13px; color:#64748b; line-height:1.6; }
+    @media(max-width:600px) { main { padding:14px 8px; } .controls { align-items:flex-start; font-size:12px; } }
+  </style>
+</head>
+<body>
+  <main>
+    <div class="controls"><span>Návrh celého okruhu k posouzení</span><label><input id="original-toggle" type="checkbox" checked>Původní stopa</label></div>
+    <div id="diagram"></div>
+    <footer>Dokončený uzavřený okruh se 14 zatáčkami. První vracečka je prohloubená a návratová část uzavírá trať ve stejné šířce. Levá a pravá strana jsou vztažené ke směru jízdy.</footer>
+  </main>
+  <script src="brno-full-circuit.js"></script>
+</body>
+</html>
