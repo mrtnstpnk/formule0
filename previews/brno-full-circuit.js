@@ -105,9 +105,54 @@
     });
   }
   function buildGeometry() {
-    const centerline=sample(revised), sections=edges(centerline,true);
+    const reference=edges(sample(revised),true);
+    const centers=reference.map(s=>({x:(s.left.x+s.right.x)/2,y:(s.left.y+s.right.y)/2}));
+    const count=reference.length;
+    const sections=reference.map((s,i)=>({...s,center:{...centers[i],balance:s.center.balance}}));
+    const clamp=(value,lo,hi)=>Math.max(lo,Math.min(hi,value));
+    const smooth=t=>t*t*t*(t*(t*6-15)+10);
+    // Straight ranges in the existing sample grid, with smooth blends
+    // into the approved corner outlines. The actual road center is used,
+    // so both walls stay parallel and exactly WIDTH units apart.
+    const straights=[
+      {start:0,end:42,blend:12,horizontal:true},
+      {start:126,end:162,blend:18,lead:6},
+      {start:252,end:288,blend:8},
+      {start:324,end:330,blend:5},
+      {start:408,end:426,blend:6},
+      {start:510,end:546,blend:9},
+      {start:606,end:624,blend:9},
+      {start:696,end:726,blend:12},
+    ];
+    for (const run of straights) {
+      const {start,end,blend}=run,lead=run.lead??blend;
+      const a=run.horizontal?{x:380,y:680}:centers[start];
+      const b=run.horizontal?{x:85,y:680}:centers[end];
+      const dx=b.x-a.x,dy=b.y-a.y,length=Math.hypot(dx,dy);
+      const lineNormal={x:dy/length,y:-dx/length};
+      const firstBalance=reference[start].center.balance,lastBalance=reference[end].center.balance;
+      for (let index=start-lead;index<=end+blend;index++) {
+        const i=(index+count)%count,old=reference[i],p=centers[i];
+        const weight=smooth(clamp(Math.min((index-start+lead)/lead,(end+blend-index)/blend),0,1));
+        const t=((p.x-a.x)*dx+(p.y-a.y)*dy)/(length*length);
+        const center={x:p.x+weight*(a.x+dx*t-p.x),y:p.y+weight*(a.y+dy*t-p.y)};
+        const nx=old.normal.x+weight*(lineNormal.x-old.normal.x),ny=old.normal.y+weight*(lineNormal.y-old.normal.y);
+        const normalLength=Math.hypot(nx,ny),normal={x:nx/normalLength,y:ny/normalLength};
+        const targetBalance=firstBalance+(lastBalance-firstBalance)*clamp(t,0,1);
+        const bias=old.center.balance+weight*(targetBalance-old.center.balance);
+        const at=distance=>({x:center.x+normal.x*distance,y:center.y+normal.y*distance});
+        sections[i]={center:{...center,balance:bias},normal,left:at(WIDTH/2),right:at(-WIDTH/2),
+          baseLeft:at(20-20*bias),baseRight:at(-20-20*bias)};
+      }
+    }
+    // Keep direction arrows on the center of the original-width gray lane.
+    const centerline=sections.map(s=>({
+      x:s.center.x-20*s.center.balance*s.normal.x,
+      y:s.center.y-20*s.center.balance*s.normal.y,
+      balance:s.center.balance,
+    }));
     return { centerline, sections, original:sample(original), originalEdges:edges(sample(original),false), turns,
-      boundaryPolygons:[sections.map(s=>s.left),sections.map(s=>s.right)], width:WIDTH };
+      boundaryPolygons:[sections.map(s=>s.left),sections.map(s=>s.right)], width:WIDTH, straights };
   }
   const coord=p=>`${p.x.toFixed(2)},${p.y.toFixed(2)}`;
   const path=(points,closed=false)=>`M ${points.map(coord).join(" L ")}${closed ? " Z" : ""}`;
