@@ -23,6 +23,7 @@ function loadGame(width, height) {
   });
   const elements = new Map();
   const sandbox = {
+    BrnoCircuit: require("../track/brno-circuit.js"),
     document: {
       getElementById(id) {
         if (!elements.has(id)) elements.set(id, makeElement());
@@ -160,8 +161,8 @@ for (const [width, height] of [[390, 788], [1024, 712]]) {
 
   test(`${width}x${height}: a shortcut that leaves and reenters the road crashes at its first exit`, () => {
     const api = loadGame(width, height);
-    const origin = api.track.centerline[40];
-    const destination = api.track.centerline[240];
+    const origin = api.track.centerline[api.track.turnIndices[1]];
+    const destination = api.track.centerline[api.track.turnIndices[10]];
     assert(api.pointInRoad(destination, api.track));
     assert.equal(api.pointInRoad(interpolate(origin, destination, 0.5), api.track), false);
     api.game.positions[0] = origin;
@@ -220,20 +221,22 @@ for (const [width, height] of [[390, 788], [1024, 712]]) {
 
   test(`${width}x${height}: returning backwards across a checkpoint clears lap progress`, () => {
     const api = loadGame(width, height);
-    api.game.positions[0] = api.track.centerline[88];
+    const index = api.track.checkpoints[0].index;
+    api.game.positions[0] = api.track.centerline[index - 2];
     begin(api, api.game.positions[0]);
-    move(api, api.track.centerline[92]);
+    move(api, api.track.centerline[index + 2]);
     assert.equal(api.game.nextCheckpoint[0], 1);
-    move(api, api.track.centerline[88]);
+    move(api, api.track.centerline[index - 2]);
     assert.equal(api.game.nextCheckpoint[0], 0);
   });
 
   test(`${width}x${height}: lap progress belongs to each player and survives turns`, () => {
     const api = loadGame(width, height);
-    api.game.positions[0] = api.track.centerline[88];
+    const index = api.track.checkpoints[0].index;
+    api.game.positions[0] = api.track.centerline[index - 2];
     begin(api, api.game.positions[0]);
-    move(api, api.track.centerline[92]);
-    end(api, api.track.centerline[92]);
+    move(api, api.track.centerline[index + 2]);
+    end(api, api.track.centerline[index + 2]);
     assert.equal(api.game.nextCheckpoint[0], 1);
     assert.equal(api.game.nextCheckpoint[1], 0);
     passOpponent(api);
@@ -245,11 +248,12 @@ for (const [width, height] of [[390, 788], [1024, 712]]) {
 
   test(`${width}x${height}: stopping exactly on a checkpoint counts it once`, () => {
     const api = loadGame(width, height);
-    api.game.positions[0] = api.track.centerline[89];
+    const index = api.track.checkpoints[0].index;
+    api.game.positions[0] = api.track.centerline[index - 1];
     begin(api, api.game.positions[0]);
-    move(api, api.track.centerline[90]);
+    move(api, api.track.centerline[index]);
     assert.equal(api.game.nextCheckpoint[0], 1);
-    move(api, api.track.centerline[91]);
+    move(api, api.track.centerline[index + 1]);
     assert.equal(api.game.nextCheckpoint[0], 1);
   });
 
@@ -264,6 +268,38 @@ for (const [width, height] of [[390, 788], [1024, 712]]) {
     assert.equal(api.pointInRoad({ x: width / 2, y: height / 2 }, track), false);
     for (const p of track.centerline) assert(api.pointInRoad(p, track));
     assert(api.pointInPolygon(track.startPoint, track.startZonePolygon));
+  });
+
+  test(`${width}x${height}: playable walls match the approved preview after scaling and rotation`, () => {
+    const api = loadGame(width, height);
+    const plan = require("../track/brno-circuit.js").buildGeometry();
+    const { track } = api;
+    assert.equal(track.centerline.length, plan.sections.length);
+    assert.equal(track.turnIndices.length, 14);
+    const orient = p => height >= width ? { x: -p.y, y: p.x } : p;
+    const anchor = orient(plan.sections[12].left);
+    const offset = { x: track.left[0].x - anchor.x * track.scale, y: track.left[0].y - anchor.y * track.scale };
+    for (let i = 0; i < plan.sections.length; i++) {
+      for (const side of ["left", "right"]) {
+        const p = orient(plan.sections[(i + 12) % plan.sections.length][side]);
+        const expected = { x: p.x * track.scale + offset.x, y: p.y * track.scale + offset.y };
+        assert(api.dist(track[side][i], expected) < 1e-7);
+      }
+      assert(Math.abs(api.dist(track.left[i], track.right[i]) - 80 * track.scale) < 1e-7);
+    }
+  });
+
+  test(`${width}x${height}: lap gates cannot be crossed from another part of the circuit`, () => {
+    const api = loadGame(width, height);
+    const line = api.track.centerline;
+    for (const gate of api.track.lapGates) {
+      let crossings = 0;
+      for (let i = 0; i < line.length; i++) {
+        const hit = api.segIntersect(line[i], line[(i + 1) % line.length], gate.p1, gate.p2);
+        if (hit && api.dist(line[i], hit) > 1e-7) crossings++;
+      }
+      assert.equal(crossings, 1);
+    }
   });
 
   test(`${width}x${height}: walls never intersect themselves or each other`, () => {

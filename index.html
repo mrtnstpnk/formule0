@@ -105,6 +105,7 @@
     <button id="rematchBtn">Rematch</button>
   </div>
 
+<script src="track/brno-circuit.js"></script>
 <script>
 (function () {
   "use strict";
@@ -175,17 +176,6 @@
     return dist(pt, { x: p1.x + t * dx, y: p1.y + t * dy }) <= GEOMETRY_EPSILON;
   }
 
-  // Catmull-Rom spline interpolation of a single scalar component.
-  function catmullRom(p0, p1, p2, p3, t) {
-    const t2 = t * t, t3 = t2 * t;
-    return 0.5 * (
-      (2 * p1) +
-      (-p0 + p2) * t +
-      (2 * p0 - 5 * p1 + 4 * p2 - p3) * t2 +
-      (-p0 + 3 * p1 - 3 * p2 + p3) * t3
-    );
-  }
-
   // Returns intersection point + param t (along p1->p2) of two segments, or null.
   function segIntersect(p1, p2, p3, p4) {
     const d1x = p2.x - p1.x, d1y = p2.y - p1.y;
@@ -250,128 +240,70 @@
   //   Cyclic splines close the centerline and both walls without an end cap.
   // =========================================================================
 
-  // Hand-placed plan coordinates, with start/finish on the bottom straight.
-  // Reference: https://www.automotodrombrno.cz/content/uploads/2019/07/CzechGP-mapa.pdf
-  const BRNO_ANCHORS = [
-    [320, 590], [240, 590], [160, 590], [85, 590],
-    [45, 580], [23, 550], [23, 516], [43, 487], [80, 475],
-    [140, 466], [210, 442], [280, 410], [350, 377], [408, 348],
-    [433, 324], [433, 296], [415, 273], [390, 253],
-    [378, 225], [383, 195], [409, 169],
-    [472, 124], [535, 78], [592, 37], [620, 24],
-    [645, 32], [660, 61], [669, 94], [657, 120],
-    [625, 134], [602, 147], [590, 173], [600, 199], [628, 214],
-    [670, 219], [714, 225], [740, 215], [754, 192],
-    [755, 165], [769, 141], [794, 131], [824, 142],
-    [885, 180], [950, 220], [1012, 259], [1056, 288],
-    [1075, 312], [1072, 338], [1051, 358], [1022, 363],
-    [966, 355], [911, 346], [884, 353], [868, 375],
-    [865, 407], [851, 430], [822, 442], [770, 445],
-    [700, 447], [630, 450], [563, 455], [531, 468],
-    [509, 493], [501, 523], [497, 550], [476, 575],
-    [447, 590], [410, 596], [367, 593],
-  ];
-
-  const TRACK_SAMPLES = 360;
-  const TRACK_HALF_WIDTH = 20; // plan units; widened for finger drawing
+  // The game and the approved design preview share these exact boundaries.
+  const circuitPlan = BrnoCircuit.buildGeometry();
 
   function generateTrack(width, height) {
     const minDim = Math.min(width, height);
     const portrait = height >= width;
     const margin = minDim * 0.065;
-    const n = BRNO_ANCHORS.length;
-    const raw = [];
-    for (let i = 0; i < n; i++) {
-      const p0 = BRNO_ANCHORS[(i + n - 1) % n];
-      const p1 = BRNO_ANCHORS[i];
-      const p2 = BRNO_ANCHORS[(i + 1) % n];
-      const p3 = BRNO_ANCHORS[(i + 2) % n];
-      for (let s = 0; s < 10; s++) {
-        raw.push({
-          x: catmullRom(p0[0], p1[0], p2[0], p3[0], s / 10),
-          y: catmullRom(p0[1], p1[1], p2[1], p3[1], s / 10),
-        });
-      }
-    }
-
-    // Uniform distance samples keep widths, grid and lap gates consistent.
-    const lengths = [0];
-    for (let i = 0; i < raw.length; i++) {
-      lengths.push(lengths[i] + dist(raw[i], raw[(i + 1) % raw.length]));
-    }
-    const plan = [];
-    let span = 0;
-    for (let i = 0; i < TRACK_SAMPLES; i++) {
-      const distance = lengths[raw.length] * i / TRACK_SAMPLES;
-      while (lengths[span + 1] < distance) span++;
-      const t = (distance - lengths[span]) / (lengths[span + 1] - lengths[span]);
-      const a = raw[span], b = raw[(span + 1) % raw.length];
-      const x = a.x + (b.x - a.x) * t, y = a.y + (b.y - a.y) * t;
-      plan.push(portrait ? { x: -y, y: x } : { x, y });
-    }
-    const xs = plan.map(p => p.x), ys = plan.map(p => p.y);
-    const minX = Math.min(...xs) - TRACK_HALF_WIDTH;
-    const maxX = Math.max(...xs) + TRACK_HALF_WIDTH;
-    const minY = Math.min(...ys) - TRACK_HALF_WIDTH;
-    const maxY = Math.max(...ys) + TRACK_HALF_WIDTH;
+    const orient = p => portrait ? { x: -p.y, y: p.x } : { x: p.x, y: p.y };
+    const outline = circuitPlan.boundaryPolygons.flat().map(orient);
+    const xs = outline.map(p => p.x), ys = outline.map(p => p.y);
+    const minX = Math.min(...xs), maxX = Math.max(...xs);
+    const minY = Math.min(...ys), maxY = Math.max(...ys);
     const scale = Math.min((width - 2 * margin) / (maxX - minX), (height - 2 * margin) / (maxY - minY));
-    const centerline = plan.map(p => ({
-      x: width / 2 + (p.x - (minX + maxX) / 2) * scale,
-      y: height / 2 + (p.y - (minY + maxY) / 2) * scale,
-      w: TRACK_HALF_WIDTH * scale,
-    }));
-    const left = [], right = [];
-    const len = centerline.length;
-    for (let i = 0; i < len; i++) {
-      const prev = centerline[(i + len - 1) % len];
-      const next = centerline[(i + 1) % len];
-      let tx = next.x - prev.x, ty = next.y - prev.y;
-      const tl = Math.hypot(tx, ty) || 1;
-      tx /= tl; ty /= tl;
-      const nx = -ty, ny = tx; // perpendicular normal
-      const p = centerline[i];
-      left.push({ x: p.x + nx * p.w, y: p.y + ny * p.w });
-      right.push({ x: p.x - nx * p.w, y: p.y - ny * p.w });
+    function transform(point) {
+      const p = orient(point);
+      return { x: width / 2 + (p.x - (minX + maxX) / 2) * scale,
+        y: height / 2 + (p.y - (minY + maxY) / 2) * scale };
     }
 
-    // Build wall segment lists for collision testing.
+    // Put the shared start/finish at index zero, as expected by the lap logic.
+    const finishSection = 12;
+    const len = circuitPlan.sections.length;
+    const indexOf = sourceIndex => (sourceIndex - finishSection + len) % len;
+    const ordered = Array.from({ length: len }, (_, i) => circuitPlan.sections[(i + finishSection) % len]);
+    const centerline = ordered.map(s => ({ ...transform(s.center), w: circuitPlan.width * scale / 2 }));
+    const left = ordered.map(s => transform(s.left));
+    const right = ordered.map(s => transform(s.right));
     const wallSegments = [];
     for (let i = 0; i < len; i++) {
       wallSegments.push({ p1: left[i], p2: left[(i + 1) % len], type: "wall" });
       wallSegments.push({ p1: right[i], p2: right[(i + 1) % len], type: "wall" });
     }
-
     function makeGate(index, type, checkpoint = null) {
       const before = centerline[(index + len - 1) % len];
       const after = centerline[(index + 1) % len];
-      return { p1: left[index], p2: right[index], type, checkpoint,
+      return { p1: left[index], p2: right[index], type, checkpoint, index,
         forward: { x: after.x - before.x, y: after.y - before.y } };
     }
     const finishSegment = makeGate(0, "finish");
-    const checkpoints = [0.25, 0.5, 0.75].map((fraction, i) => makeGate(Math.round(len * fraction), "checkpoint", i));
+    // These three straights have unambiguous crossings in the approved layout.
+    const checkpoints = [144, 528, 708].map((index, i) => makeGate(indexOf(index), "checkpoint", i));
     const lapGates = checkpoints.concat([finishSegment]);
-
     const boundsSegments = [
       { p1: { x: 0, y: 0 }, p2: { x: width, y: 0 }, type: "bounds" },
       { p1: { x: width, y: 0 }, p2: { x: width, y: height }, type: "bounds" },
       { p1: { x: width, y: height }, p2: { x: 0, y: height }, type: "bounds" },
       { p1: { x: 0, y: height }, p2: { x: 0, y: 0 }, type: "bounds" },
     ];
-
     function band(indices) {
       return indices.map(i => left[(i + len) % len])
         .concat(indices.slice().reverse().map(i => right[(i + len) % len]));
     }
     const startZonePolygon = band(Array.from({ length: 13 }, (_, i) => len - 14 + i));
-    const finishBandPolygon = band([-1, 0, 1]);
-
+    const finishBandPolygon = band([-2, -1, 0, 1, 2]);
+    const turnIndices = circuitPlan.turns.map(turn => indexOf(turn.anchor * 12));
+    const arrowIndices = [2, 10, 13, 21, 27, 33, 35, 39, 44, 48, 52, 55, 59, 63, 66]
+      .map(anchor => indexOf(anchor * 12 + 4));
     return {
-      width, height, minDim,
-      centerline, left, right,
-      wallSegments, finishSegment, checkpoints, lapGates, boundsSegments,
-      startZonePolygon, finishBandPolygon,
+      width, height, minDim, scale,
+      centerline, left, right, wallSegments, finishSegment, checkpoints, lapGates,
+      boundsSegments, startZonePolygon, finishBandPolygon, turnIndices, arrowIndices,
       collisionSegments: wallSegments.concat(boundsSegments),
       startPoint: centerline[len - 8],
+      labelPoint: transform({ x: 560, y: 400 }),
     };
   }
 
@@ -433,7 +365,7 @@
     // Direction arrows follow the clockwise lap, including in portrait.
     sctx.strokeStyle = "#64748b";
     sctx.lineWidth = 2;
-    for (let i = 18; i < track.centerline.length; i += 45) {
+    for (const i of track.arrowIndices) {
       const p = track.centerline[i], next = track.centerline[(i + 1) % track.centerline.length];
       const angle = Math.atan2(next.y - p.y, next.x - p.x);
       const size = p.w * 0.55;
@@ -452,9 +384,9 @@
     sctx.font = `700 ${Math.round(clamp(track.minDim * 0.045, 14, 22))}px sans-serif`;
     sctx.textAlign = "center";
     sctx.textBaseline = "middle";
-    sctx.fillText("BRNO", W / 2, H / 2);
+    sctx.fillText("BRNO", track.labelPoint.x, track.labelPoint.y);
     sctx.font = "12px sans-serif";
-    sctx.fillText("1 LAP", W / 2, H / 2 + 22);
+    sctx.fillText("1 LAP", track.labelPoint.x, track.labelPoint.y + 22);
   }
 
   function drawPolygonPath(c, pts, begin = true) {
@@ -564,7 +496,7 @@
     const required = game.positions[game.currentPlayer];
 
     if (required === null) {
-      if (!pointInPolygon(pos, track.startZonePolygon)) return; // ignored: outside start zone
+      if (!pointInPolygon(pos, track.startZonePolygon) || !pointInRoad(pos, track)) return;
     } else {
       const tolerance = clamp(track.minDim * 0.06, 24, 60);
       if (dist(pos, required) > tolerance) return; // ignored: too far from car

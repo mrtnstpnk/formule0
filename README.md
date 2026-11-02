@@ -6,8 +6,8 @@ stroke per turn to move their car around a closed circuit shaped like the
 modern Automotodrom Brno. Cross a wall and you crash; complete one clockwise
 lap and cross the finish line first to win.
 
-Single-file prototype: one `index.html` with inline CSS/JS, HTML5 canvas,
-no frameworks, no build step.
+Buildless browser game: `index.html` with inline CSS/JS, HTML5 canvas, and
+shared circuit geometry in `track/brno-circuit.js`. No frameworks or build step.
 
 ## How to play
 
@@ -48,15 +48,19 @@ node --test tests/collision.test.cjs
 
 These tests run the game's input handlers with a canvas stub and cover wall
 collisions, recovery after a crash, shortcuts, closed-wall geometry, and complete
-laps in portrait and landscape layouts. No dependencies are required.
+laps in portrait and landscape layouts. They also verify that the playable
+walls exactly match the approved preview and that each lap gate has only one
+crossing of the circuit. No dependencies are required.
 
 ## Brno circuit
 
 The hand-placed outline is a simplified interpretation of the modern circuit
 in the [official Automotodrom Brno map](https://www.automotodrombrno.cz/content/uploads/2019/07/CzechGP-mapa.pdf).
-Its proportions are preserved, with a wider road for finger drawing. On portrait
-screens the whole plan rotates to use the available space. The map is a reference;
-the game loads no external assets or map services.
+The playable circuit uses the approved 80-unit-wide layout, including its
+asymmetric widening and smoothed corner transitions. On portrait screens the
+whole plan rotates to use the available space while preserving its proportions.
+The map is a reference; all geometry is bundled with the game and no map
+services or third-party CDNs are used at runtime.
 
 ## Deploying to GitHub Pages
 
@@ -78,19 +82,18 @@ To enable it on GitHub:
 - **Config** — tunables like stroke duration and player colors.
 - **Game state machine** — `WAITING_FOR_TOUCH` → `DRAWING` →
   `WAITING_FOR_TOUCH` / `GAME_OVER`.
-- **Geometry helpers** — segment intersection, point-in-polygon,
-  Catmull-Rom spline interpolation.
-- **Track generation** — smooths a cyclic Brno centerline, samples it at
-  uniform distances, and builds closed inner/outer walls, a green grid,
-  and a shared start/finish stripe. The infield stays outside the road.
+- **Geometry helpers** — segment intersection and point-in-polygon checks.
+- **Track generation** — scales and rotates the approved shared geometry.
+  Rendering and collisions use its exact closed wall polygons, with a green
+  grid and shared start/finish stripe. The infield stays outside the road.
 - **Rendering** — a pre-rendered static track layer plus per-frame
   strokes, crash markers, and the stroke time indicator.
 - **Input handling** — Pointer Events unify touch and mouse.
 - **Game logic** — turn handling, crash detection, three ordered directional
   checkpoints per player, full-lap finish detection, and reset/rematch.
 
-The prototype has one circuit. Its outline is defined by `BRNO_ANCHORS` in
-`index.html`; changing the anchors changes the shape of the closed lap.
+The prototype has one circuit. `track/brno-circuit.js` defines the layout and
+exports the same geometry to both the game and the full design preview.
 
 ## Track design preview
 
