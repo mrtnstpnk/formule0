@@ -40,9 +40,9 @@
     39:[795,200], 40:[809,176], 41:[834,166], 42:[864,177], 43:[925,215],
     // Continue the turn-9 straight into the outward-widened turn 10.
     44:[990,255], 45:[1052,294], 46:[1096,323], 47:[1115,347],
-    48:[1112,373], 49:[1091,393], 50:[1062,398], 51:[1006,390], 52:[951,381],
+    48:[1112,373], 49:[1091,393], 50:[1062,398], 51:[1006,390], 52:[956,362],
     // Complete the 11/12 S and its return straight at the same 80-unit width.
-    53:[924,388], 54:[908,410], 55:[905,442], 56:[891,465],
+    53:[922.06,376.06], 54:[908,410], 55:[905,442], 56:[891,465],
     57:[862,477], 58:[810,480], 59:[740,482], 60:[670,485],
     // Open the final 13/14 S vertically to meet the lower start straight.
     61:[603,490], 62:[565,504], 63:[538,533], 64:[529,570],
@@ -51,8 +51,8 @@
   for (const [i, point] of Object.entries(changes)) revised[i] = point;
   const balance = original.map((_, i) => {
     if (i <= 11) return 1;
-    if (i === 12 || i === 18 || i === 31 || i === 39) return 0;
-    if ((i >= 13 && i <= 17) || (i >= 32 && i <= 38)) return -1;
+    if (i === 12 || i === 18 || i === 39) return 0;
+    if ((i >= 13 && i <= 17) || (i >= 31 && i <= 38)) return -1;
     if (i === 52 || i === 55 || i === 61 || i === 65) return 0;
     if ((i >= 53 && i <= 54) || (i >= 62 && i <= 64)) return -1;
     return 1;
@@ -104,6 +104,45 @@
         baseRight:{x:p.x-leftNormal.x*20,y:p.y-leftNormal.y*20} };
     });
   }
+  function softenCurveTransitions(sections) {
+    const count=sections.length;
+    const sigma=16, support=sigma*4;
+    const lengths=sections.map((s,i)=>{
+      const next=sections[(i+1)%count];
+      return Math.hypot(next.center.x-s.center.x,next.center.y-s.center.y);
+    });
+    // Fair both boundaries in physical distance, not sample count. A compact
+    // smooth window spreads each abrupt curvature change over a short arc.
+    // Reproject the paired edges to keep every cross-section 80 units wide.
+    return sections.map((section,i)=>{
+      let lx=0,ly=0,rx=0,ry=0,bias=0,total=0;
+      function accumulate(index,distance) {
+        const s=sections[index],u=distance/support;
+        const weight=Math.exp(-0.5*(distance/sigma)**2)*(1-u*u)**3
+          *(lengths[(index+count-1)%count]+lengths[index])/2;
+        lx+=s.left.x*weight; ly+=s.left.y*weight;
+        rx+=s.right.x*weight; ry+=s.right.y*weight;
+        bias+=s.center.balance*weight; total+=weight;
+      }
+      accumulate(i,0);
+      for (const direction of [-1,1]) {
+        let index=i,distance=0;
+        for (let step=1;step<count;step++) {
+          distance+=direction>0?lengths[index]:lengths[(index+count-1)%count];
+          index=(index+direction+count)%count;
+          if (distance>=support) break;
+          accumulate(index,distance);
+        }
+      }
+      lx/=total; ly/=total; rx/=total; ry/=total; bias/=total;
+      const center={x:(lx+rx)/2,y:(ly+ry)/2,balance:bias};
+      const separation=Math.hypot(lx-rx,ly-ry);
+      const normal={x:(lx-rx)/separation,y:(ly-ry)/separation};
+      const at=distance=>({x:center.x+normal.x*distance,y:center.y+normal.y*distance});
+      return {center,normal,left:at(WIDTH/2),right:at(-WIDTH/2),
+        baseLeft:at(20-20*bias),baseRight:at(-20-20*bias)};
+    });
+  }
   function buildGeometry() {
     const reference=edges(sample(revised),true);
     const centers=reference.map(s=>({x:(s.left.x+s.right.x)/2,y:(s.left.y+s.right.y)/2}));
@@ -121,7 +160,7 @@
       {start:324,end:330,blend:5},
       {start:408,end:426,blend:6},
       {start:510,end:546,blend:9},
-      {start:606,end:624,blend:9},
+      {start:606,end:612,blend:12},
       {start:696,end:726,blend:12},
     ];
     for (const run of straights) {
@@ -145,6 +184,8 @@
           baseLeft:at(20-20*bias),baseRight:at(-20-20*bias)};
       }
     }
+    const rounded=softenCurveTransitions(sections);
+    for (let i=0;i<count;i++) sections[i]=rounded[i];
     // Keep direction arrows on the center of the original-width gray lane.
     const centerline=sections.map(s=>({
       x:s.center.x-20*s.center.balance*s.normal.x,
@@ -184,7 +225,7 @@
       <style>text{font-family:system-ui,-apple-system,sans-serif;fill:#334155} .turn path{fill:none;stroke-width:1.5}.turn text{fill:white}.callout path{fill:none;stroke:#94a3b8;stroke-width:1.5}.callout text{font-size:15px;font-weight:600}.original{fill:none;stroke:#a16207;stroke-width:1.6;stroke-dasharray:7 6;opacity:.65}.hide-original .original{display:none}</style>
       <rect x="-165" y="-145" width="1510" height="1105" fill="#f8fafc"/>
       ${label(-110,-94,"BRNO / CELÝ OKRUH","start",28)}
-      ${label(-110,-62,"Jednotná šířka 80 · větší první vracečka · dokončené zatáčky 10–14","start",17)}
+      ${label(-110,-62,"Jednotná šířka 80 · plynulé přechody zatáček · větší první vracečka","start",17)}
       <g fill="#e2e8f0">${ring(...g.boundaryPolygons)}</g>
       <g fill="#99f6e4">${strip("left","baseLeft")}</g>
       <g fill="#bfdbfe">${strip("baseRight","right")}</g>

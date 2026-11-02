@@ -98,6 +98,9 @@ The prototype has one circuit. Its outline is defined by `BRNO_ANCHORS` in
 the same 80-unit width, with turn 10 widened outward and a taller first hairpin
 to make room for the final 11–14 sequence and lower start/finish straight.
 The straights have parallel edges and smooth transitions into the bends.
+Corner transitions are faired in physical distance to vary their curvature
+gradually while retaining 80-unit cross-sections. The entry to turn 11 uses a
+broader reference arc, and widening switches sides before the tight turn 7.
 
 [Brno turns 1–9](previews/brno-turns-1-9.html) shows the proposed one-sided
 widening from 40 to 80 relative units and the revised connecting straights.
