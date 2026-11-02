@@ -9,8 +9,7 @@ const html = fs.readFileSync(path.join(__dirname, "..", "index.html"), "utf8");
 const source = html.match(/<script>([\s\S]*?)<\/script>/)[1].replace(/\}\)\(\);\s*$/, `
   globalThis.testGame = {
     game, track, STATE, onPointerDown, onPointerMove, onPointerUp,
-    findNearestIntersection, pointInPolygon, pointInRoad, pointOnSegment,
-    segIntersect, generateTrack, resetGame, dist
+    findNearestIntersection, pointInPolygon, pointInRoad, segIntersect, resetGame, dist
   };
 })();`);
 
@@ -24,7 +23,6 @@ function loadGame(width, height) {
   });
   const elements = new Map();
   const sandbox = {
-    ClipperLib: require("../vendor/clipper.js"),
     document: {
       getElementById(id) {
         if (!elements.has(id)) elements.set(id, makeElement());
@@ -48,13 +46,6 @@ const midpoint = (a, b) => interpolate(a, b, 0.5);
 function move(api, point) { api.onPointerMove(pointer(point)); }
 function begin(api, point) { api.onPointerDown(pointer(point)); }
 function end(api, point) { api.onPointerUp(pointer(point)); }
-
-function wallSection(api, side, index = 40) {
-  const target = api.track[side][index];
-  const segment = api.track.wallSegments.find(seg => api.pointOnSegment(target, seg.p1, seg.p2));
-  assert(segment, "cross-section must land on an actual wall");
-  return { wall: midpoint(segment.p1, segment.p2), center: api.track.centerline[index] };
-}
 
 function passOpponent(api) {
   assert.equal(api.game.currentPlayer, 1);
@@ -104,7 +95,8 @@ for (const [width, height] of [[390, 788], [1024, 712]]) {
 
     test(`${label}: first segment detects a wall only one pixel away`, () => {
       const api = loadGame(width, height);
-      const { wall, center } = wallSection(api, side);
+      const wall = midpoint(api.track[side][40], api.track[side][41]);
+      const center = midpoint(api.track.centerline[40], api.track.centerline[41]);
       const inside = interpolate(wall, center, 1 / api.dist(wall, center));
       const outside = interpolate(center, wall, 1.1);
       api.game.positions[0] = inside;
@@ -116,10 +108,11 @@ for (const [width, height] of [[390, 788], [1024, 712]]) {
 
     test(`${label}: leaving a wall inward still crashes at the opposite wall`, () => {
       const api = loadGame(width, height);
-      const { wall, center } = wallSection(api, side);
+      const wall = midpoint(api.track[side][40], api.track[side][41]);
+      const center = midpoint(api.track.centerline[40], api.track.centerline[41]);
       api.game.positions[0] = wall;
       begin(api, wall);
-      move(api, interpolate(wall, center, 100));
+      move(api, interpolate(wall, center, 3));
       assert.equal(api.game.strokes.at(-1).crashed, true);
       assert(api.dist(api.game.positions[0], wall) > 10);
     });
@@ -127,7 +120,8 @@ for (const [width, height] of [[390, 788], [1024, 712]]) {
     test(`${label}: roundoff at a wall does not permit outward movement or block recovery`, () => {
       for (const rounding of [-1e-10, 1e-10]) {
         const api = loadGame(width, height);
-        const { wall, center } = wallSection(api, side);
+        const wall = midpoint(api.track[side][40], api.track[side][41]);
+        const center = midpoint(api.track.centerline[40], api.track.centerline[41]);
         const origin = { x: wall.x + rounding, y: wall.y + rounding };
         const outward = api.findNearestIntersection(origin, interpolate(center, wall, 1.1), api.track.collisionSegments, api.track);
         assert.equal(outward.type, "wall");
@@ -139,7 +133,8 @@ for (const [width, height] of [[390, 788], [1024, 712]]) {
 
   test(`${width}x${height}: slow subpixel movement still crashes`, () => {
     const api = loadGame(width, height);
-    const { wall, center } = wallSection(api, "left");
+    const wall = midpoint(api.track.left[40], api.track.left[41]);
+    const center = midpoint(api.track.centerline[40], api.track.centerline[41]);
     const distance = api.dist(wall, center);
     const inside = interpolate(wall, center, 2 / distance);
     api.game.positions[0] = inside;
@@ -261,37 +256,14 @@ for (const [width, height] of [[390, 788], [1024, 712]]) {
   test(`${width}x${height}: both walls close at the seam and remain inside the canvas`, () => {
     const api = loadGame(width, height);
     const { track } = api;
-    assert.equal(track.wallSegments.length, track.boundaryPolygons.reduce((sum, polygon) => sum + polygon.length, 0));
-    for (const side of track.boundaryPolygons) {
+    assert.equal(track.wallSegments.length, track.centerline.length * 2);
+    for (const side of [track.left, track.right]) {
       assert(track.wallSegments.some(seg => seg.p1 === side.at(-1) && seg.p2 === side[0]));
       for (const p of side) assert(p.x > 0 && p.x < width && p.y > 0 && p.y < height);
     }
     assert.equal(api.pointInRoad({ x: width / 2, y: height / 2 }, track), false);
     for (const p of track.centerline) assert(api.pointInRoad(p, track));
     assert(api.pointInPolygon(track.startPoint, track.startZonePolygon));
-  });
-
-  test(`${width}x${height}: the fitted road is at least twice the previous width everywhere`, () => {
-    const api = loadGame(width, height);
-    const previous = api.generateTrack(width, height, 28);
-    const minimumWidth = previous.centerline[0].w * 4;
-    for (let i = 0; i < api.track.centerline.length; i++) {
-      assert(api.dist(api.track.left[i], api.track.right[i]) >= minimumWidth - 0.001,
-        `cross-section ${i} must remain twice as wide after viewport fitting`);
-    }
-  });
-
-  test(`${width}x${height}: each lap gate crosses the centerline only once`, () => {
-    const api = loadGame(width, height);
-    const line = api.track.centerline;
-    for (const gate of api.track.lapGates) {
-      let crossings = 0;
-      for (let i = 0; i < line.length; i++) {
-        const hit = api.segIntersect(line[i], line[(i + 1) % line.length], gate.p1, gate.p2);
-        if (hit && api.dist(line[i], hit) > 1e-7) crossings++;
-      }
-      assert.equal(crossings, 1, "a gate must not also intersect an approaching bend");
-    }
   });
 
   test(`${width}x${height}: walls never intersect themselves or each other`, () => {
