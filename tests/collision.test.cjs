@@ -172,12 +172,13 @@ test("malformed or unsupported saved settings fall back to valid defaults", () =
     const api = loadGame(390, 788, { start: false, savedSettings });
     assert.equal(api.settings.strokeDurationMs, 500);
     assert.equal(api.settings.showHint, true);
-    assert.equal(api.settings.vibration, true);
+    assert.equal(api.settings.playerCount, 2);
   }
-  const api = loadGame(390, 788, { start: false, savedSettings: '{"strokeDurationMs":800,"showHint":false,"vibration":false,"showTimer":false}' });
+  const api = loadGame(390, 788, { start: false, savedSettings: '{"strokeDurationMs":800,"playerCount":4,"showHint":false,"vibration":false,"showTimer":false}' });
   assert.equal(api.settings.strokeDurationMs, 800);
   assert.equal(api.settings.showHint, false);
-  assert.equal(api.settings.vibration, false);
+  assert.equal(api.settings.playerCount, 4);
+  assert.equal("vibration" in api.settings, false);
   assert.equal(api.settings.showTimer, false);
 });
 
@@ -186,6 +187,117 @@ test("a finished race offers a new start instead of continuing the finished race
   api.game.state = api.STATE.GAME_OVER;
   api.showScreen("home");
   assert.equal(api.element("resumeBtn").hidden, true);
+});
+
+for (const count of [1, 2, 3, 4]) {
+  test(`${count} player race cycles through exactly the selected players`, () => {
+    const api = loadGame(390, 788, { savedSettings: JSON.stringify({ playerCount: count }) });
+    assert.equal(api.game.playerCount, count);
+    assert.equal(api.game.positions.length, count);
+    assert.equal(api.game.nextCheckpoint.length, count);
+    for (let turn = 0; turn < count * 2; turn++) {
+      const player = turn % count;
+      assert.equal(api.game.currentPlayer, player);
+      const position = api.game.positions[player] || api.track.startPoint;
+      begin(api, position);
+      assert.equal(api.game.state, api.STATE.DRAWING);
+      end(api, position);
+      assert.equal(api.game.strokes.at(-1).player, player);
+      assert.equal(api.game.currentPlayer, (player + 1) % count);
+    }
+  });
+}
+
+test("invalid player counts fall back to two and old settings remain usable", () => {
+  for (const playerCount of [0, 5, -1, 1.5, "3", null]) {
+    const api = loadGame(390, 788, { savedSettings: JSON.stringify({ playerCount }) });
+    assert.equal(api.game.playerCount, 2);
+    assert.equal(api.settings.playerCount, 2);
+  }
+  const api = loadGame(390, 788, { savedSettings: '{"strokeDurationMs":800,"vibration":false}' });
+  assert.equal(api.game.playerCount, 2);
+  assert.equal(api.settings.strokeDurationMs, 800);
+  assert.equal("vibration" in api.settings, false);
+});
+
+test("changing player count preserves an existing race and applies to the next new race", () => {
+  const api = loadGame(390, 788);
+  begin(api, api.track.startPoint);
+  end(api, api.track.startPoint);
+  const position = api.game.positions[0];
+  api.settings.playerCount = 4;
+  api.showScreen("home");
+  api.showScreen("race");
+  assert.equal(api.game.playerCount, 2);
+  assert.equal(api.game.currentPlayer, 1);
+  assert.equal(api.game.positions[0], position);
+  api.startRace();
+  assert.equal(api.game.playerCount, 4);
+  assert.equal(api.game.positions.length, 4);
+  assert.equal(api.game.strokes.length, 0);
+  assert.deepEqual([...api.game.nextCheckpoint], [0, 0, 0, 0]);
+});
+
+test("all four players keep separate checkpoint progress and positions", () => {
+  const api = loadGame(390, 788, { savedSettings: '{"playerCount":4}' });
+  const index = api.track.checkpoints[0].index;
+  for (let player = 0; player < 4; player++) {
+    api.game.positions[player] = api.track.centerline[index - 2];
+    begin(api, api.game.positions[player]);
+    move(api, api.track.centerline[index + 2]);
+    end(api, api.track.centerline[index + 2]);
+    assert.equal(api.game.nextCheckpoint[player], 1);
+    assert.equal(api.game.positions[player], api.game.strokes.at(-1).points.at(-1));
+    for (let other = player + 1; other < 4; other++) assert.equal(api.game.nextCheckpoint[other], 0);
+  }
+  assert.equal(api.game.currentPlayer, 0);
+  assert.deepEqual([...api.game.nextCheckpoint], [1, 1, 1, 1]);
+});
+
+test("player four can finish and has a named victory screen", () => {
+  const api = loadGame(390, 788, { savedSettings: '{"playerCount":4}' });
+  const finish = api.track.centerline[0], prev = api.track.centerline.at(-2);
+  const origin = interpolate(finish, prev, 1 / api.dist(finish, prev));
+  api.game.currentPlayer = 3;
+  api.game.positions[3] = origin;
+  api.game.nextCheckpoint[3] = api.track.checkpoints.length;
+  begin(api, origin);
+  move(api, interpolate(finish, prev, -5 / api.dist(finish, prev)));
+  assert.equal(api.game.state, api.STATE.GAME_OVER);
+  assert.equal(api.game.winner, 3);
+  assert.equal(api.element("victoryText").textContent, "Hráč 4 vítězí!");
+});
+
+test("solo mode can complete a lap over multiple turns without an opponent", () => {
+  const api = loadGame(390, 788, { savedSettings: '{"playerCount":1}' });
+  const len = api.track.centerline.length;
+  const halfway = Math.floor(len / 2);
+  begin(api, api.track.startPoint);
+  for (let i = len - 7; i <= len + halfway; i++) move(api, api.track.centerline[i % len]);
+  end(api, api.track.centerline[halfway]);
+  assert.equal(api.game.currentPlayer, 0);
+  assert.equal(api.game.state, api.STATE.WAITING_FOR_TOUCH);
+  begin(api, api.game.positions[0]);
+  for (let i = halfway + 1; i <= len; i++) move(api, api.track.centerline[i % len]);
+  assert.equal(api.game.state, api.STATE.GAME_OVER);
+  assert.equal(api.game.winner, 0);
+});
+
+test("rotation preserves the positions and lap progress of all four players", () => {
+  const api = loadGame(820, 1124, { savedSettings: '{"playerCount":4}' });
+  const indices = [30, 150, 450, 700];
+  for (let player = 0; player < 4; player++) {
+    api.game.positions[player] = api.track.centerline[indices[player]];
+    api.game.strokes.push({ player, points: [api.game.positions[player]], crashed: false });
+    api.game.nextCheckpoint[player] = player;
+  }
+  api.resizeTo(1180, 764);
+  assert.equal(api.game.playerCount, 4);
+  for (let player = 0; player < 4; player++) {
+    assert(api.dist(api.game.positions[player], api.track.centerline[indices[player]]) < 1e-7);
+    assert.equal(api.game.positions[player], api.game.strokes[player].points[0]);
+    assert.equal(api.game.nextCheckpoint[player], player);
+  }
 });
 
 test("tablet rotation preserves both cars, complete stroke history, crash markers and lap progress", () => {

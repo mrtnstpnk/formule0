@@ -1,7 +1,7 @@
 # Formule
 
-A two-player pen-and-paper racing game, playable hot-seat on one phone or
-tablet. Based on the classic paper game where each player draws one quick
+A pen-and-paper racing game for 1–4 players on one phone or tablet,
+played solo or hot-seat. Based on the classic paper game where each player draws one quick
 stroke per turn to move their car around a closed circuit shaped like the
 modern Automotodrom Brno. Cross a wall and you crash; complete one clockwise
 lap and cross the finish line first to win.
@@ -16,8 +16,11 @@ to start, **Nastavení** to adjust the game, or **O hře** for rules and game
 information. The home screen previews the same Brno circuit used in the race.
 
 Settings include difficulty (**Lehká**: 800 ms, **Střední**: 500 ms,
-**Těžká**: 300 ms per turn), crash vibration, the visual countdown and the
-pre-race hint. The default is **Střední**, with 500 ms per turn.
+**Těžká**: 300 ms per turn), player count (1–4), the visual countdown and the
+pre-race hint. The defaults are **Střední** (500 ms) and two players.
+Player count applies to a new race; changing it does not alter a race that
+is already in progress. Each player has a separate color and lap progress.
+In solo mode, every turn belongs to the same player until the lap is complete.
 Changes save automatically in this browser, with an **Obnovit výchozí**
 button to restore defaults. If browser storage is unavailable, settings
 still work for the current session.

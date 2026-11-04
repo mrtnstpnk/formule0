@@ -24,13 +24,15 @@ button:focus-visible, a:focus-visible, select:focus-visible, input:focus-visible
 }
 .screen-inner { max-width: 1152px; margin: 0 auto; padding: 32px 40px 24px; min-height: 100%; display: flex; flex-direction: column; }
 .menu-header { display: flex; align-items: center; justify-content: space-between; gap: 16px; }
-.brand { display: flex; align-items: center; gap: 12px; }
-.brand-mark { width: 40px; height: 40px; border: 1px solid #41577a; border-radius: 11px; display: grid; place-items: center; font-size: 19px; font-weight: 900; font-style: italic; letter-spacing: -2px; }
-.brand-caption { color: var(--menu-muted); font-size: 11px; font-weight: 650; letter-spacing: 0.16em; text-transform: uppercase; }
-.players-pill { display: flex; align-items: center; gap: 9px; border: 1px solid var(--menu-border); border-radius: 100px; padding: 8px 12px; color: #c3cede; font-size: 12px; }
+.brand { display: flex; align-items: center; gap: 12px; min-width: 0; }
+.brand-mark { width: 40px; height: 40px; flex: none; border: 1px solid #41577a; border-radius: 11px; display: grid; place-items: center; font-size: 19px; font-weight: 900; font-style: italic; letter-spacing: -2px; }
+.brand-caption { min-width: 0; color: var(--menu-muted); font-size: 11px; font-weight: 650; letter-spacing: 0.16em; text-transform: uppercase; }
+.players-pill { display: flex; align-items: center; flex-shrink: 0; white-space: nowrap; gap: 9px; border: 1px solid var(--menu-border); border-radius: 100px; padding: 8px 12px; color: #c3cede; font-size: 12px; }
 .player-pair { display: flex; padding-left: 3px; }
 .player-pair i { width: 9px; height: 9px; border-radius: 50%; background: #5288ff; border: 2px solid #18233a; box-sizing: content-box; margin-left: -3px; }
 .player-pair i + i { background: #f0787c; }
+.player-pair i:nth-child(3) { background: #4ade80; }
+.player-pair i:nth-child(4) { background: #fbbf24; }
 .home-layout { display: grid; grid-template-columns: 0.9fr 1.25fr; gap: 64px; align-items: center; flex: 1; padding: 56px 0; }
 .eyebrow { margin: 0 0 18px; color: #7fa7f7; font-size: 11px; font-weight: 750; letter-spacing: 0.18em; text-transform: uppercase; }
 .home-title { margin: 0; font-size: clamp(48px, 6vw, 76px); font-weight: 900; font-style: italic; line-height: 1; letter-spacing: -0.07em; }

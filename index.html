@@ -85,7 +85,7 @@
     <div class="screen-inner">
       <header class="menu-header">
         <div class="brand"><span class="brand-mark" aria-hidden="true">F0</span><span class="brand-caption">Závody jedním tahem</span></div>
-        <span class="players-pill"><span class="player-pair" aria-hidden="true"><i></i><i></i></span>2 hráči · 1 zařízení</span>
+        <span class="players-pill"><span class="player-pair" aria-hidden="true"><i id="homePlayer1"></i><i id="homePlayer2"></i><i id="homePlayer3" hidden></i><i id="homePlayer4" hidden></i></span><span id="homePlayersLabel">2 hráči · 1 zařízení</span></span>
       </header>
       <div class="home-layout">
         <section class="home-intro">
@@ -100,7 +100,7 @@
               <button id="aboutBtn" class="menu-button"><svg class="icon" aria-hidden="true"><use href="#icon-info"/></svg>O hře</button>
             </div>
           </nav>
-          <p class="local-note">Vyzvi soupeře. Stačí jeden telefon a dva prsty.</p>
+          <p class="local-note">Vyraz na trať sám nebo vyzvi přátele.</p>
         </section>
         <section class="circuit-card" aria-label="Brněnský okruh">
           <div class="circuit-card-header"><p class="eyebrow">Brněnský okruh</p><span class="track-tag">PŘIPRAVEN NA START</span></div>
@@ -132,8 +132,8 @@
           <select id="difficultySetting"><option value="800">Lehká</option><option value="500" selected>Střední</option><option value="300">Těžká</option></select>
         </div>
         <div class="setting-row">
-          <label class="setting-copy" for="vibrationSetting"><strong>Vibrace při nárazu</strong><small>Na zařízeních, která vibrace podporují.</small></label>
-          <label class="toggle"><input id="vibrationSetting" type="checkbox" checked></label>
+          <label class="setting-copy" for="playerCountSetting"><strong>Počet hráčů</strong><small>Pro nový závod na jednom zařízení.</small></label>
+          <select id="playerCountSetting"><option value="1">1</option><option value="2" selected>2</option><option value="3">3</option><option value="4">4</option></select>
         </div>
         <div class="setting-row">
           <label class="setting-copy" for="timerSetting"><strong>Odpočet u tahu</strong><small>Kroužek ukazuje zbývající čas.</small></label>
@@ -151,11 +151,11 @@
   <section id="aboutScreen" class="screen" aria-labelledby="aboutTitle" hidden>
     <div class="screen-inner detail-inner">
       <button id="aboutBackBtn" class="back-button"><svg class="icon" aria-hidden="true"><use href="#icon-back"/></svg>Zpět do menu</button>
-      <header class="page-heading"><p class="eyebrow">Seznam se s okruhem</p><h1 id="aboutTitle" tabindex="-1">O hře</h1><p>Papírové závody pro dva. Jeden brněnský okruh.</p></header>
+      <header class="page-heading"><p class="eyebrow">Seznam se s okruhem</p><h1 id="aboutTitle" tabindex="-1">O hře</h1><p>Papírové závody pro 1 až 4 hráče. Jeden brněnský okruh.</p></header>
       <article class="about-card">
         <h2>Jak se závodí</h2>
         <ol class="how-to">
-          <li><div><strong>Střídejte se v tazích</strong><p>Každý hráč kreslí jednu rychlou čáru prstem nebo myší. První tah začíná v zeleném startovním poli, další u vlastní poslední pozice. Na tah máš <span id="aboutDuration">500 ms</span>.</p></div></li>
+          <li><div><strong>Každý má svůj tah</strong><p>Hráči se střídají, v sólu pokračuješ po každém tahu sám. Kresli jednu rychlou čáru prstem nebo myší. První tah začíná v zeleném startovním poli, další u vlastní poslední pozice. Na tah máš <span id="aboutDuration">500 ms</span>.</p></div></li>
           <li><div><strong>Drž se mezi obrubníky</strong><p>Náraz ukončí tah na okraji dráhy. Příště začni kdekoliv v kroužku kolem auta, klidně i za obrubníkem. Z kroužku musíš vyjet dovnitř dráhy.</p></div></li>
           <li><div><strong>Dokonči celé kolo</strong><p>Jeď po směru šipek, projeď celý okruh a jako první překroč cílovou čáru. Zkratky ani jízda v protisměru k vítězství nevedou.</p></div></li>
         </ol>
@@ -180,9 +180,9 @@
   <div id="hint">
     <h2>Na start, připravit…</h2>
     <p>
-      Střídejte se a kreslete <strong>jeden rychlý tah</strong> prstem nebo myší.
-      Začněte v zeleném poli. Na každý tah máte <strong id="hintDuration">500 ms</strong>.
-      Po nárazu začněte uvnitř kroužku a vyjeďte z něj do dráhy.
+      Každý hráč kreslí <strong>jeden rychlý tah</strong> prstem nebo myší.
+      Začni v zeleném poli. Na každý tah máš <strong id="hintDuration">500 ms</strong>.
+      Po nárazu začni uvnitř kroužku a vyjeď z něj do dráhy.
       První, kdo po směru šipek dokončí celé kolo, vítězí.
     </p>
     <button id="dismissHintBtn" class="menu-button button-primary">Rozumím, jdeme závodit</button>
@@ -207,11 +207,12 @@
   // CONFIG
   // =========================================================================
   const STROKE_DURATION_MS = 500;      // how long a single turn's stroke lasts
-  const PLAYER_COLORS = ["#2563eb", "#dc2626"];   // player 1 blue, player 2 red
-  const PLAYER_NAMES = ["Hráč 1", "Hráč 2"];
+  const PLAYER_COLORS = ["#2563eb", "#dc2626", "#15803d", "#b45309"];
+  const PLAYER_NAMES = ["Hráč 1", "Hráč 2", "Hráč 3", "Hráč 4"];
   const SETTINGS_KEY = "formule0.settings.v1";
   const TURN_DURATIONS = [300, 500, 800];
-  const DEFAULT_SETTINGS = { strokeDurationMs: STROKE_DURATION_MS, vibration: true, showTimer: true, showHint: true };
+  const PLAYER_COUNTS = [1, 2, 3, 4];
+  const DEFAULT_SETTINGS = { strokeDurationMs: STROKE_DURATION_MS, playerCount: 2, showTimer: true, showHint: true };
 
   function loadSettings() {
     let saved;
@@ -219,7 +220,8 @@
     const result = { ...DEFAULT_SETTINGS };
     if (!saved || typeof saved !== "object") return result;
     if (TURN_DURATIONS.includes(saved.strokeDurationMs)) result.strokeDurationMs = saved.strokeDurationMs;
-    for (const key of ["vibration", "showTimer", "showHint"]) {
+    if (PLAYER_COUNTS.includes(saved.playerCount)) result.playerCount = saved.playerCount;
+    for (const key of ["showTimer", "showHint"]) {
       if (typeof saved[key] === "boolean") result[key] = saved[key];
     }
     return result;
@@ -236,9 +238,10 @@
 
   const game = {
     state: STATE.WAITING_FOR_TOUCH,
-    currentPlayer: 0,                 // 0 or 1
-    positions: [null, null],          // {x,y} current car position, null = must start in start zone
-    nextCheckpoint: [0, 0],           // each player's progress through the ordered lap gates
+    playerCount: settings.playerCount, // fixed for the current race
+    currentPlayer: 0,
+    positions: Array(settings.playerCount).fill(null), // null = must start in start zone
+    nextCheckpoint: Array(settings.playerCount).fill(0), // progress through the ordered lap gates
     strokes: [],                      // committed strokes: {player, points:[{x,y}], crashed}
     crashMarkers: [],                 // {x,y} visual crash markers
     currentStroke: null,              // in-progress stroke: {player, points:[{x,y}]}
@@ -310,7 +313,13 @@
 
   function updateSettingsUI() {
     document.getElementById("difficultySetting").value = String(settings.strokeDurationMs);
-    for (const [id, key] of [["vibrationSetting", "vibration"], ["timerSetting", "showTimer"], ["hintSetting", "showHint"]]) {
+    document.getElementById("playerCountSetting").value = String(settings.playerCount);
+    document.getElementById("homePlayersLabel").textContent = settings.playerCount +
+      (settings.playerCount === 1 ? " hráč" : " hráči") + " · 1 zařízení";
+    for (let player = 1; player <= PLAYER_COLORS.length; player++) {
+      document.getElementById("homePlayer" + player).hidden = player > settings.playerCount;
+    }
+    for (const [id, key] of [["timerSetting", "showTimer"], ["hintSetting", "showHint"]]) {
       document.getElementById(id).checked = settings[key];
     }
     for (const id of ["homeDuration", "aboutDuration", "hintDuration"]) {
@@ -341,7 +350,12 @@
     if (TURN_DURATIONS.includes(value)) settings.strokeDurationMs = value;
     saveSettings();
   });
-  for (const [id, key] of [["vibrationSetting", "vibration"], ["timerSetting", "showTimer"], ["hintSetting", "showHint"]]) {
+  document.getElementById("playerCountSetting").addEventListener("change", function () {
+    const value = Number(this.value);
+    if (PLAYER_COUNTS.includes(value)) settings.playerCount = value;
+    saveSettings();
+  });
+  for (const [id, key] of [["timerSetting", "showTimer"], ["hintSetting", "showHint"]]) {
     document.getElementById(id).addEventListener("change", function () { settings[key] = this.checked; saveSettings(); });
   }
   document.getElementById("defaultsBtn").addEventListener("click", function () {
@@ -681,7 +695,7 @@
     }
 
     // player position dots (where the next stroke must begin)
-    for (let p = 0; p < 2; p++) {
+    for (let p = 0; p < game.playerCount; p++) {
       const pos = game.positions[p];
       if (pos && !(game.currentStroke && game.currentStroke.player === p)) {
         ctx.beginPath();
@@ -889,12 +903,11 @@
     if (reason === "crash") {
       game.crashMarkers.push({ x: lastPoint.x, y: lastPoint.y });
       flashScreen();
-      if (settings.vibration && navigator.vibrate) navigator.vibrate(80);
     }
 
     game.currentStroke = null;
     game.activePointerId = null;
-    game.currentPlayer = 1 - game.currentPlayer;
+    game.currentPlayer = (game.currentPlayer + 1) % game.playerCount;
     game.state = STATE.WAITING_FOR_TOUCH;
     updateTopBar();
   }
@@ -928,9 +941,10 @@
 
   function resetGame() {
     game.state = STATE.WAITING_FOR_TOUCH;
+    game.playerCount = settings.playerCount;
     game.currentPlayer = 0;
-    game.positions = [null, null];
-    game.nextCheckpoint = [0, 0];
+    game.positions = Array(game.playerCount).fill(null);
+    game.nextCheckpoint = Array(game.playerCount).fill(0);
     game.strokes = [];
     game.crashMarkers = [];
     game.currentStroke = null;
