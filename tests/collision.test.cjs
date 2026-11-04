@@ -114,6 +114,7 @@ for (const [width, height] of [[390, 788], [1024, 712]]) {
       const { wall, at } = wallStart(api, side);
       begin(api, at(-8));
       const radius = api.game.currentStroke.startCircle.radius;
+      assert(Math.abs(radius * 2 - api.dist(api.track.left[40], api.track.right[40])) < 1e-7);
       for (const offset of [-8, -10, 2, -4, radius - 0.1]) {
         move(api, at(offset));
         assert.equal(api.game.state, api.STATE.DRAWING);

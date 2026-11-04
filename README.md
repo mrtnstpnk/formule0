@@ -21,8 +21,9 @@ shared circuit geometry in `track/brno-circuit.js`. No frameworks or build step.
   the turn passes to the other player. Your next stroke starts from the
   crash point.
 - After a crash, the circle is centered on the wall and extends outside the
-  road. Finger movement inside it is tolerated. Leave the circle into the
-  road to resume driving; leaving it outside ends the turn at the original
+  road. Its diameter matches the road width. Finger movement inside it is
+  tolerated. Leave the circle into the road to resume driving; leaving it
+  outside ends the turn at the original
   crash point. Normal wall collisions resume immediately after the first
   exit, including within the same fast movement. Releasing or running out
   of time inside the circle leaves the car in place.
