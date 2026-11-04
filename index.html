@@ -157,7 +157,7 @@
         <ol class="how-to">
           <li><div><strong>Každý má svůj tah</strong><p>Hráči se střídají, v sólu pokračuješ po každém tahu sám. Kresli jednu rychlou čáru prstem nebo myší. První tah začíná v zeleném startovním poli, další u vlastní poslední pozice. Na tah máš <span id="aboutDuration">500 ms</span>.</p></div></li>
           <li><div><strong>Drž se mezi obrubníky</strong><p>Náraz ukončí tah na okraji dráhy. Příště začni kdekoliv v kroužku kolem auta, klidně i za obrubníkem. Z kroužku musíš vyjet dovnitř dráhy.</p></div></li>
-          <li><div><strong>Dokonči celé kolo</strong><p>Jeď po směru šipek, projeď celý okruh a jako první překroč cílovou čáru. Zkratky ani jízda v protisměru k vítězství nevedou.</p></div></li>
+          <li><div><strong>Dokonči celé kolo</strong><p>Jeď po směru šipek a projeď celý okruh. Po prvním dojezdu dostanou hráči s menším počtem tahů poslední tah. Při stejném počtu tahů vyhrává nejdelší dojezd za cílem; při úplné shodě je remíza. Tah v cíli nekončí, pokračuj až do jeho konce.</p></div></li>
         </ol>
       </article>
       <p class="about-note">Formule0 převádí klasickou hru s tužkou a papírem na společnou obrazovku. Trať je inspirovaná Automotodromem Brno a má 14 zatáček.<br><a href="https://github.com/mrtnstpnk/formule0" target="_blank" rel="noopener noreferrer">Projekt na GitHubu ↗</a></p>
@@ -168,7 +168,7 @@
   <div id="topbar">
     <div id="turnIndicator">
       <div id="turnDot"></div>
-      <span id="turnLabel">Na tahu: Hráč 1</span>
+      <span class="turn-copy"><span id="turnLabel">Na tahu: Hráč 1</span><span id="raceStatus" class="race-status" role="status" hidden></span></span>
     </div>
     <div class="topbar-actions"><button id="menuBtn" class="topbar-button">Menu</button><button id="restartBtn">Restart</button></div>
   </div>
@@ -183,7 +183,8 @@
       Každý hráč kreslí <strong>jeden rychlý tah</strong> prstem nebo myší.
       Začni v zeleném poli. Na každý tah máš <strong id="hintDuration">500 ms</strong>.
       Po nárazu začni uvnitř kroužku a vyjeď z něj do dráhy.
-      První, kdo po směru šipek dokončí celé kolo, vítězí.
+      Dokonči celé kolo po směru šipek. Soupeři s menším počtem tahů dostanou poslední tah.
+      Při shodě rozhoduje dojezd za cílem, proto za čárou pokračuj v tahu.
     </p>
     <button id="dismissHintBtn" class="menu-button button-primary">Rozumím, jdeme závodit</button>
   </div>
@@ -193,6 +194,7 @@
   <div id="victory">
     <div class="medal">&#127942;</div>
     <h1 id="victoryText">Hráč 1 vítězí!</h1>
+    <p id="victorySummary" class="victory-summary"></p>
     <button id="rematchBtn">Odveta</button>
     <button id="victoryMenuBtn" class="victory-menu">Zpět do menu</button>
   </div>
@@ -242,6 +244,9 @@
     currentPlayer: 0,
     positions: Array(settings.playerCount).fill(null), // null = must start in start zone
     nextCheckpoint: Array(settings.playerCount).fill(0), // progress through the ordered lap gates
+    turnsTaken: Array(settings.playerCount).fill(0),
+    finishes: Array(settings.playerCount).fill(null), // {turns, distance} in unscaled circuit units
+    finalTurn: null,                  // equal-turn deadline after the first completed lap
     strokes: [],                      // committed strokes: {player, points:[{x,y}], crashed}
     crashMarkers: [],                 // {x,y} visual crash markers
     currentStroke: null,              // in-progress stroke: {player, points:[{x,y}]}
@@ -249,6 +254,7 @@
     strokeDurationMs: settings.strokeDurationMs,
     activePointerId: null,
     winner: null,
+    winners: [],
     hintDismissed: false,
   };
 
@@ -507,6 +513,30 @@
     const indexOf = sourceIndex => (sourceIndex - finishSection + len) % len;
     const ordered = Array.from({ length: len }, (_, i) => circuitPlan.sections[(i + finishSection) % len]);
     const centerline = ordered.map(s => ({ ...transform(s.center), w: circuitPlan.width * scale / 2 }));
+    const distances = [0];
+    for (let i = 0; i < len; i++) distances.push(distances[i] + dist(centerline[i], centerline[(i + 1) % len]) / scale);
+    const lapLength = distances[len];
+    function roadProgress(point) {
+      let nearest = Infinity, progress = 0;
+      for (let i = 0; i < len; i++) {
+        const a = centerline[i], b = centerline[(i + 1) % len];
+        const dx = b.x - a.x, dy = b.y - a.y;
+        const lengthSquared = dx * dx + dy * dy;
+        const t = lengthSquared === 0 ? 0 : clamp(((point.x - a.x) * dx + (point.y - a.y) * dy) / lengthSquared, 0, 1);
+        const distance = (point.x - a.x - t * dx) ** 2 + (point.y - a.y - t * dy) ** 2;
+        if (distance < nearest) {
+          nearest = distance;
+          progress = distances[i] + t * (distances[i + 1] - distances[i]);
+        }
+      }
+      return progress % lapLength;
+    }
+    function progressBetween(from, to) {
+      let delta = roadProgress(to) - roadProgress(from);
+      if (delta > lapLength / 2) delta -= lapLength;
+      if (delta < -lapLength / 2) delta += lapLength;
+      return delta;
+    }
     const left = ordered.map(s => transform(s.left));
     const right = ordered.map(s => transform(s.right));
     const wallSegments = [];
@@ -540,7 +570,7 @@
     const arrowIndices = [2, 10, 13, 21, 27, 33, 35, 39, 44, 48, 52, 55, 59, 63, 66]
       .map(anchor => indexOf(anchor * 12 + 4));
     return {
-      width, height, minDim, scale, toPlan, fromPlan: transform,
+      width, height, minDim, scale, toPlan, fromPlan: transform, progressBetween,
       centerline, left, right, wallSegments, finishSegment, checkpoints, lapGates,
       boundsSegments, startZonePolygon, finishBandPolygon, turnIndices, arrowIndices,
       collisionSegments: wallSegments.concat(boundsSegments),
@@ -801,23 +831,14 @@
 
       // Commit the local recovery only after a valid exit. Still check the
       // rest of this same pointer segment, even if its endpoint is on road.
-      const finish = advanceLap(from, exit, null);
-      stroke.points.push(finish ? { x: finish.x, y: finish.y } : exit);
-      if (finish) {
-        endStroke("win");
-        return;
-      }
+      advanceLap(from, exit, null);
+      stroke.points.push(exit);
       from = exit;
     }
     if (dist(from, pos) <= GEOMETRY_EPSILON) return;
 
     const hit = findNearestIntersection(from, pos, track.collisionSegments, track);
-    const finish = advanceLap(from, pos, hit);
-    if (finish) {
-      stroke.points.push({ x: finish.x, y: finish.y });
-      endStroke("win");
-      return;
-    }
+    advanceLap(from, pos, hit);
     if (hit) {
       stroke.points.push({ x: hit.x, y: hit.y });
       endStroke("crash");
@@ -855,6 +876,14 @@
   // =========================================================================
 
   function advanceLap(from, to, wallHit) {
+    const player = game.currentPlayer;
+    const endpoint = wallHit || to;
+    if (game.finishes[player]) {
+      // Signed progress along the road counts forward travel and reversals,
+      // independent of screen orientation or extra sideways finger movement.
+      game.finishes[player].distance += track.progressBetween(from, endpoint);
+      return;
+    }
     const crossings = [];
     for (const gate of track.lapGates) {
       const hit = segIntersect(from, to, gate.p1, gate.p2);
@@ -863,14 +892,19 @@
       crossings.push({ ...hit, gate });
     }
     crossings.sort((a, b) => a.t - b.t);
-    const player = game.currentPlayer;
     for (const hit of crossings) {
       const gate = hit.gate;
       const forward = (to.x - from.x) * gate.forward.x + (to.y - from.y) * gate.forward.y > 0;
       if (!forward) {
         game.nextCheckpoint[player] = 0;
       } else if (gate.type === "finish") {
-        if (game.nextCheckpoint[player] === track.checkpoints.length) return hit;
+        if (game.nextCheckpoint[player] === track.checkpoints.length) {
+          const turns = game.turnsTaken[player] + 1;
+          game.finishes[player] = { turns, distance: track.progressBetween(hit, endpoint) };
+          if (game.finalTurn === null) game.finalTurn = turns;
+          updateTopBar();
+          return;
+        }
         game.nextCheckpoint[player] = 0;
       } else if (gate.checkpoint === game.nextCheckpoint[player]) {
         game.nextCheckpoint[player]++;
@@ -878,7 +912,19 @@
         game.nextCheckpoint[player] = gate.checkpoint === 0 ? 1 : 0;
       }
     }
-    return null;
+  }
+
+  function finishRace() {
+    const finishers = game.finishes.map((finish, player) => ({ finish, player }))
+      .filter(entry => entry.finish && entry.finish.turns === game.finalTurn);
+    const furthest = Math.max(...finishers.map(entry => entry.finish.distance));
+    game.winners = finishers.filter(entry => Math.abs(entry.finish.distance - furthest) <= GEOMETRY_EPSILON)
+      .map(entry => entry.player);
+    game.winner = game.winners.length === 1 ? game.winners[0] : null;
+    game.currentPlayer = game.winners[0];
+    game.state = STATE.GAME_OVER;
+    showVictory(game.winners);
+    render();
   }
 
   function endStroke(reason) {
@@ -890,15 +936,7 @@
     stroke.crashed = (reason === "crash");
     game.strokes.push(stroke);
     game.positions[stroke.player] = lastPoint;
-
-    if (reason === "win") {
-      game.state = STATE.GAME_OVER;
-      game.winner = stroke.player;
-      game.currentStroke = null;
-      showVictory(stroke.player);
-      render();
-      return;
-    }
+    game.turnsTaken[stroke.player]++;
 
     if (reason === "crash") {
       game.crashMarkers.push({ x: lastPoint.x, y: lastPoint.y });
@@ -907,7 +945,16 @@
 
     game.currentStroke = null;
     game.activePointerId = null;
-    game.currentPlayer = (game.currentPlayer + 1) % game.playerCount;
+    let nextPlayer = (game.currentPlayer + 1) % game.playerCount;
+    if (game.finalTurn !== null) {
+      nextPlayer = null;
+      for (let step = 1; step <= game.playerCount; step++) {
+        const player = (stroke.player + step) % game.playerCount;
+        if (game.turnsTaken[player] < game.finalTurn) { nextPlayer = player; break; }
+      }
+      if (nextPlayer === null) { finishRace(); return; }
+    }
+    game.currentPlayer = nextPlayer;
     game.state = STATE.WAITING_FOR_TOUCH;
     updateTopBar();
   }
@@ -928,14 +975,24 @@
     turnDot.style.background = PLAYER_COLORS[p];
     turnDot.style.color = PLAYER_COLORS[p];
     turnLabel.textContent = "Na tahu: " + PLAYER_NAMES[p];
+    const status = document.getElementById("raceStatus");
+    status.hidden = game.finalTurn === null;
+    status.textContent = game.finishes[p] ? "Dojezd za cíl" : "Poslední tah";
   }
 
-  function showVictory(player) {
-    turnDot.style.background = PLAYER_COLORS[player];
-    turnDot.style.color = PLAYER_COLORS[player];
-    turnLabel.textContent = PLAYER_NAMES[player] + " vítězí!";
-    victoryText.textContent = PLAYER_NAMES[player] + " vítězí!";
-    victoryText.style.color = PLAYER_COLORS[player];
+  function showVictory(winners) {
+    const tied = winners.length > 1;
+    const color = tied ? "#e2e8f0" : PLAYER_COLORS[winners[0]];
+    turnDot.style.background = color;
+    turnDot.style.color = color;
+    const title = tied ? "Remíza!" : PLAYER_NAMES[winners[0]] + " vítězí!";
+    turnLabel.textContent = title;
+    victoryText.textContent = title;
+    victoryText.style.color = color;
+    document.getElementById("raceStatus").hidden = true;
+    document.getElementById("victorySummary").textContent = tied ?
+      winners.map(player => PLAYER_NAMES[player]).join(", ") + " — stejný počet tahů i dojezd." :
+      "Počet tahů: " + game.finalTurn + (game.finishes.filter(Boolean).length > 1 ? " · Rozhodl dojezd za cílem." : " · Kolo dokončeno.");
     victoryEl.classList.add("show");
   }
 
@@ -945,11 +1002,15 @@
     game.currentPlayer = 0;
     game.positions = Array(game.playerCount).fill(null);
     game.nextCheckpoint = Array(game.playerCount).fill(0);
+    game.turnsTaken = Array(game.playerCount).fill(0);
+    game.finishes = Array(game.playerCount).fill(null);
+    game.finalTurn = null;
     game.strokes = [];
     game.crashMarkers = [];
     game.currentStroke = null;
     game.activePointerId = null;
     game.winner = null;
+    game.winners = [];
     victoryEl.classList.remove("show");
     flashEl.classList.remove("active", "fading");
     updateTopBar();

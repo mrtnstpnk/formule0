@@ -4,7 +4,7 @@ A pen-and-paper racing game for 1–4 players on one phone or tablet,
 played solo or hot-seat. Based on the classic paper game where each player draws one quick
 stroke per turn to move their car around a closed circuit shaped like the
 modern Automotodrom Brno. Cross a wall and you crash; complete one clockwise
-lap and cross the finish line first to win.
+lap in the fewest turns to win, with an equal-turn final chance for later starters.
 
 Buildless browser game: `index.html`, `menu.css`, HTML5 canvas, and
 shared circuit geometry in `track/brno-circuit.js`. No frameworks or build step.
@@ -55,8 +55,15 @@ point before the geometry changes; the race then continues in the new layout.
 - Follow the arrows clockwise around the entire circuit. The green start
   zone sits just before the shared start/finish line. Crossing it at the
   beginning does not win; you must complete a full lap first.
-- First player to finish the lap wins. Going backwards across a lap gate
-  clears lap progress. Tap **Odveta** to play again.
+- The first completed lap starts the final round. Players who have taken
+  fewer turns get their remaining turn; players with the same number of turns
+  do not get another. The race is decided after these turns finish.
+- Crossing the finish does not end the stroke. Among finishers with the same
+  turn count, the furthest final position along the road beyond the finish wins.
+  Sideways movement adds no distance, reversing reduces it, and collisions
+  still stop the stroke. Equal distances result in a draw.
+- Going backwards across a lap gate before finishing clears lap progress.
+  Tap **Odveta** to play again.
 
 ## Running locally
 

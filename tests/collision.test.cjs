@@ -99,6 +99,216 @@ function wallStart(api, side, index = 40) {
   return { wall, center, at };
 }
 
+function finalApproach(count = 2, first = 0, turn = 3) {
+  const api = loadGame(390, 788, { savedSettings: JSON.stringify({ playerCount: count }) });
+  api.game.currentPlayer = first;
+  api.game.turnsTaken = Array.from({ length: count }, (_, player) => player < first ? turn : turn - 1);
+  api.game.positions = Array.from({ length: count }, () => ({ ...api.track.centerline.at(-2) }));
+  api.game.nextCheckpoint = Array(count).fill(api.track.checkpoints.length);
+  return api;
+}
+
+function finishAt(api, index) {
+  begin(api, api.game.positions[api.game.currentPlayer]);
+  move(api, api.track.centerline[index]);
+  assert.equal(api.game.state, api.STATE.DRAWING, "the stroke must continue beyond the finish");
+  end(api, api.track.centerline[index]);
+}
+
+function stopBeforeFinish(api) {
+  const position = api.game.positions[api.game.currentPlayer];
+  begin(api, position);
+  end(api, position);
+}
+
+test("the second starter wins without an extra turn for the first starter after finishing first", () => {
+  const api = finalApproach(2, 1);
+  finishAt(api, 4);
+  assert.equal(api.game.state, api.STATE.GAME_OVER);
+  assert.equal(api.game.winner, 1);
+  assert.deepEqual([...api.game.turnsTaken], [3, 3]);
+});
+
+test("the first starter must wait for the second player's final turn", () => {
+  const api = finalApproach();
+  finishAt(api, 4);
+  assert.equal(api.game.state, api.STATE.WAITING_FOR_TOUCH);
+  assert.equal(api.game.winner, null);
+  assert.equal(api.game.finalTurn, 3);
+  assert.equal(api.game.currentPlayer, 1);
+  assert.equal(api.element("raceStatus").textContent, "Poslední tah");
+  stopBeforeFinish(api);
+  assert.equal(api.game.state, api.STATE.GAME_OVER);
+  assert.equal(api.game.winner, 0);
+  assert.deepEqual([...api.game.turnsTaken], [3, 3]);
+});
+
+for (const [firstDistance, secondDistance, winner] of [[4, 10, 1], [10, 4, 0]]) {
+  test(`equal-turn finishers at sections ${firstDistance} and ${secondDistance} choose the further endpoint`, () => {
+    const api = finalApproach();
+    finishAt(api, firstDistance);
+    finishAt(api, secondDistance);
+    assert.equal(api.game.state, api.STATE.GAME_OVER);
+    assert.equal(api.game.winner, winner);
+    assert.equal(api.game.finishes[0].turns, 3);
+    assert.equal(api.game.finishes[1].turns, 3);
+    assert(api.game.finishes[winner].distance > api.game.finishes[1 - winner].distance);
+  });
+}
+
+test("crossing the line keeps the pointer active and records the whole stroke after the finish", () => {
+  const api = finalApproach();
+  begin(api, api.game.positions[0]);
+  move(api, api.track.centerline[1]);
+  const near = api.game.finishes[0].distance;
+  assert.equal(api.game.activePointerId, 1);
+  assert.equal(api.game.winner, null);
+  assert.equal(api.element("raceStatus").textContent, "Dojezd za cíl");
+  move(api, api.track.centerline[10]);
+  assert(api.game.finishes[0].distance > near);
+  end(api, api.track.centerline[10]);
+  assert(api.dist(api.game.positions[0], api.track.centerline[10]) < 1e-7);
+});
+
+test("exactly equal finish distances are a draw instead of favoring the first starter", () => {
+  const api = finalApproach();
+  finishAt(api, 6);
+  finishAt(api, 6);
+  assert.equal(api.game.state, api.STATE.GAME_OVER);
+  assert.equal(api.game.winner, null);
+  assert.deepEqual([...api.game.winners], [0, 1]);
+  assert.equal(api.element("victoryText").textContent, "Remíza!");
+});
+
+test("sideways movement after the finish does not increase the final distance", () => {
+  const api = finalApproach();
+  begin(api, api.game.positions[0]);
+  move(api, api.track.centerline[4]);
+  const distance = api.game.finishes[0].distance;
+  for (let i = 0; i < 3; i++) {
+    move(api, interpolate(api.track.left[4], api.track.right[4], 0.2));
+    move(api, interpolate(api.track.left[4], api.track.right[4], 0.8));
+    move(api, api.track.centerline[4]);
+  }
+  assert(Math.abs(api.game.finishes[0].distance - distance) < 1e-7);
+  end(api, api.track.centerline[4]);
+  finishAt(api, 8);
+  assert.equal(api.game.winner, 1);
+});
+
+test("reversing after crossing the finish reduces the distance", () => {
+  const api = finalApproach();
+  begin(api, api.game.positions[0]);
+  move(api, api.track.centerline[12]);
+  move(api, api.track.centerline[4]);
+  end(api, api.track.centerline[4]);
+  finishAt(api, 8);
+  assert.equal(api.game.winner, 1);
+});
+
+test("reversing behind the finish records a negative distance rather than almost a whole extra lap", () => {
+  const api = finalApproach();
+  begin(api, api.game.positions[0]);
+  move(api, api.track.centerline[4]);
+  move(api, api.track.centerline.at(-2));
+  end(api, api.track.centerline.at(-2));
+  assert(api.game.finishes[0].distance < 0);
+  finishAt(api, 0);
+  assert.equal(api.game.winner, 1);
+});
+
+test("time expiry ends each final stroke and then resolves the race", () => {
+  const api = finalApproach();
+  begin(api, api.game.positions[0]);
+  move(api, api.track.centerline[4]);
+  api.elapse(501);
+  assert.equal(api.game.state, api.STATE.WAITING_FOR_TOUCH);
+  assert.equal(api.game.currentPlayer, 1);
+  begin(api, api.game.positions[1]);
+  move(api, api.track.centerline[10]);
+  api.elapse(501);
+  assert.equal(api.game.state, api.STATE.GAME_OVER);
+  assert.equal(api.game.winner, 1);
+});
+
+test("a collision after the finish clips the final distance and still gives the opponent a turn", () => {
+  const api = finalApproach();
+  begin(api, api.game.positions[0]);
+  move(api, api.track.centerline[6]);
+  move(api, interpolate(api.track.centerline[6], api.track.left[6], 1.2));
+  assert.equal(api.game.strokes.at(-1).crashed, true);
+  assert.equal(api.game.currentPlayer, 1);
+  assert(api.game.finishes[0]);
+  assert(api.dist(api.game.positions[0], api.track.left[6]) < 1e-7);
+  finishAt(api, 10);
+  assert.equal(api.game.winner, 1);
+});
+
+test("crossing the line before all checkpoints does not start the final round", () => {
+  const api = finalApproach();
+  api.game.nextCheckpoint[0] = 1;
+  begin(api, api.game.positions[0]);
+  move(api, api.track.centerline[4]);
+  end(api, api.track.centerline[4]);
+  assert.equal(api.game.finishes[0], null);
+  assert.equal(api.game.finalTurn, null);
+  assert.equal(api.game.state, api.STATE.WAITING_FOR_TOUCH);
+});
+
+for (const count of [3, 4]) {
+  for (let first = 0; first < count; first++) {
+    test(`${count} players, first finisher ${first + 1}: only later starters receive a final turn`, () => {
+      const api = finalApproach(count, first);
+      finishAt(api, 4);
+      for (let player = first + 1; player < count; player++) {
+        assert.equal(api.game.state, api.STATE.WAITING_FOR_TOUCH);
+        assert.equal(api.game.currentPlayer, player);
+        stopBeforeFinish(api);
+      }
+      assert.equal(api.game.state, api.STATE.GAME_OVER);
+      assert.equal(api.game.winner, first);
+      assert.deepEqual([...api.game.turnsTaken], Array(count).fill(3));
+    });
+  }
+}
+
+test("the third player may win a four-player final round but must wait for the fourth", () => {
+  const api = finalApproach(4);
+  finishAt(api, 4);
+  stopBeforeFinish(api);
+  finishAt(api, 12);
+  assert.equal(api.game.state, api.STATE.WAITING_FOR_TOUCH);
+  assert.equal(api.game.currentPlayer, 3);
+  finishAt(api, 8);
+  assert.equal(api.game.winner, 2);
+  assert.deepEqual([...api.game.turnsTaken], [3, 3, 3, 3]);
+});
+
+test("rotation in the final round preserves counters and distances in circuit units", () => {
+  const api = finalApproach();
+  finishAt(api, 4);
+  const distance = api.game.finishes[0].distance;
+  api.showScreen("home");
+  api.resizeTo(1024, 712);
+  assert.equal(api.game.finalTurn, 3);
+  assert.equal(api.game.finishes[0].distance, distance);
+  assert.deepEqual([...api.game.turnsTaken], [3, 2]);
+  api.showScreen("race");
+  finishAt(api, 8);
+  assert.equal(api.game.winner, 1);
+});
+
+test("a new race clears all final-round records and turn counters", () => {
+  const api = finalApproach();
+  finishAt(api, 4);
+  api.startRace();
+  assert.equal(api.game.finalTurn, null);
+  assert.deepEqual([...api.game.turnsTaken], [0, 0]);
+  assert.deepEqual([...api.game.finishes], [null, null]);
+  assert.deepEqual([...api.game.winners], []);
+  assert.equal(api.element("raceStatus").hidden, true);
+});
+
 test("home, settings and about screens cannot accidentally start a racing turn", () => {
   const api = loadGame(390, 788, { start: false });
   assert.equal(api.app.screen, "home");
@@ -259,10 +469,14 @@ test("player four can finish and has a named victory screen", () => {
   const finish = api.track.centerline[0], prev = api.track.centerline.at(-2);
   const origin = interpolate(finish, prev, 1 / api.dist(finish, prev));
   api.game.currentPlayer = 3;
+  api.game.turnsTaken = [1, 1, 1, 0];
   api.game.positions[3] = origin;
   api.game.nextCheckpoint[3] = api.track.checkpoints.length;
   begin(api, origin);
-  move(api, interpolate(finish, prev, -5 / api.dist(finish, prev)));
+  const destination = interpolate(finish, prev, -5 / api.dist(finish, prev));
+  move(api, destination);
+  assert.equal(api.game.state, api.STATE.DRAWING);
+  end(api, destination);
   assert.equal(api.game.state, api.STATE.GAME_OVER);
   assert.equal(api.game.winner, 3);
   assert.equal(api.element("victoryText").textContent, "Hráč 4 vítězí!");
@@ -279,6 +493,7 @@ test("solo mode can complete a lap over multiple turns without an opponent", () 
   assert.equal(api.game.state, api.STATE.WAITING_FOR_TOUCH);
   begin(api, api.game.positions[0]);
   for (let i = halfway + 1; i <= len; i++) move(api, api.track.centerline[i % len]);
+  end(api, api.track.centerline[0]);
   assert.equal(api.game.state, api.STATE.GAME_OVER);
   assert.equal(api.game.winner, 0);
 });
@@ -431,6 +646,8 @@ test("lap progress survives rotation, the lap can finish, and a later resize pre
   api.resizeTo(1180, 764);
   begin(api, api.game.positions[0]);
   for (let i = index + 1; i <= len; i++) move(api, api.track.centerline[i % len]);
+  end(api, api.track.centerline[0]);
+  passOpponent(api);
   assert.equal(api.game.state, api.STATE.GAME_OVER);
   assert.equal(api.game.winner, 0);
   const strokes = api.game.strokes.length;
@@ -786,6 +1003,9 @@ for (const [width, height] of [[390, 788], [1024, 712]]) {
     api.game.nextCheckpoint[0] = api.track.checkpoints.length;
     begin(api, inside);
     move(api, outside);
+    assert.equal(api.game.state, api.STATE.DRAWING);
+    end(api, outside);
+    passOpponent(api);
     assert.equal(api.game.state, api.STATE.GAME_OVER);
     assert.equal(api.game.winner, 0);
   });
@@ -805,8 +1025,11 @@ for (const [width, height] of [[390, 788], [1024, 712]]) {
     begin(api, api.track.startPoint);
     for (let i = len - 7; i <= len * 2; i++) {
       move(api, api.track.centerline[i % len]);
-      assert.equal(api.game.state, i === len * 2 ? api.STATE.GAME_OVER : api.STATE.DRAWING);
+      assert.equal(api.game.state, api.STATE.DRAWING);
     }
+    end(api, api.track.centerline[0]);
+    passOpponent(api);
+    assert.equal(api.game.state, api.STATE.GAME_OVER);
     assert.equal(api.game.winner, 0);
   });
 

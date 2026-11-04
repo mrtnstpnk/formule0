@@ -94,6 +94,11 @@ button:focus-visible, a:focus-visible, select:focus-visible, input:focus-visible
 .about-note { font-size: 13px; line-height: 1.75; color: #b5c1d2; padding: 20px 0; margin: 0; }
 .about-note a { color: #91b5ff; text-underline-offset: 4px; }
 .topbar-actions { display: flex; gap: 8px; }
+.turn-copy { display: flex; flex-direction: column; gap: 2px; }
+.race-status { font-size: 11px; font-weight: 400; color: #cbd5e1; }
+.victory-summary { color: #cbd5e1; max-width: 330px; margin: 0; font-size: 14px; line-height: 1.7; }
+#victory { overflow-y: auto; }
+#victory > * { flex-shrink: 0; }
 .topbar-button { min-height: 40px; background: #334155; color: #fff; border: 0; border-radius: 8px; padding: 8px 12px; font-size: 13px; font-weight: 600; }
 .topbar-button:hover { background: #475569; }
 .victory-menu { color: #cbd5e1; border: 0; background: transparent; padding: 14px; font-size: 14px; }
@@ -136,5 +141,10 @@ button:focus-visible, a:focus-visible, select:focus-visible, input:focus-visible
   .setting-copy small { font-size: 11px; }
   .setting-row select { padding-right: 24px; }
   .about-card { padding: 22px 18px; }
+}
+@media (max-height: 480px) {
+  #victory { justify-content: flex-start; gap: 12px; padding: 20px; }
+  #victory .medal { display: none; }
+  #victory h1 { font-size: 26px; }
 }
 @media (prefers-reduced-motion: reduce) { *, *::before, *::after { transition: none !important; } }
