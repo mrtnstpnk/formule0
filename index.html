@@ -56,19 +56,6 @@
   #flash.active { opacity: 0.32; transition: opacity 0s; }
   #flash.fading { opacity: 0; transition: opacity 0.35s ease-out; }
 
-  #victory {
-    position: fixed; inset: 0; background: rgba(15, 23, 42, 0.94);
-    display: none; flex-direction: column; align-items: center; justify-content: center;
-    gap: 18px; z-index: 30; color: #fff; text-align: center; padding: 24px;
-  }
-  #victory.show { display: flex; }
-  #victory h1 { font-size: 30px; margin: 0; }
-  #victory .medal { font-size: 48px; }
-  #rematchBtn {
-    background: #2563eb; color: #fff; border: none; padding: 14px 32px;
-    border-radius: 12px; font-size: 17px; font-weight: 700;
-  }
-  #rematchBtn:active { background: #1d4ed8; }
 </style>
 <link rel="stylesheet" href="menu.css">
 </head>
@@ -191,13 +178,13 @@
 
   <div id="flash"></div>
 
-  <div id="victory">
-    <div class="medal">&#127942;</div>
-    <h1 id="victoryText">Hráč 1 vítězí!</h1>
-    <p id="victorySummary" class="victory-summary"></p>
-    <button id="rematchBtn">Odveta</button>
-    <button id="victoryMenuBtn" class="victory-menu">Zpět do menu</button>
-  </div>
+  <section id="victory" aria-labelledby="victoryText" aria-live="polite">
+    <div class="result-heading">
+      <span class="medal" aria-hidden="true">&#127942;</span>
+      <div><h1 id="victoryText">Hráč 1 vítězí!</h1><p id="victorySummary" class="victory-summary"></p></div>
+    </div>
+    <div class="result-actions"><button id="rematchBtn">Odveta</button><button id="victoryMenuBtn" class="victory-menu">Zpět do menu</button></div>
+  </section>
   </section>
 
 <script src="track/brno-circuit.js"></script>
@@ -988,12 +975,14 @@
     const title = tied ? "Remíza!" : PLAYER_NAMES[winners[0]] + " vítězí!";
     turnLabel.textContent = title;
     victoryText.textContent = title;
-    victoryText.style.color = color;
+    victoryText.style.color = tied ? "#0f172a" : color;
     document.getElementById("raceStatus").hidden = true;
     document.getElementById("victorySummary").textContent = tied ?
       winners.map(player => PLAYER_NAMES[player]).join(", ") + " — stejný počet tahů i dojezd." :
       "Počet tahů: " + game.finalTurn + (game.finishes.filter(Boolean).length > 1 ? " · Rozhodl dojezd za cílem." : " · Kolo dokončeno.");
     victoryEl.classList.add("show");
+    raceScreen.classList.add("results-visible");
+    resize(); // reserve space for the result without covering or dimming the road
   }
 
   function resetGame() {
@@ -1012,7 +1001,9 @@
     game.winner = null;
     game.winners = [];
     victoryEl.classList.remove("show");
+    raceScreen.classList.remove("results-visible");
     flashEl.classList.remove("active", "fading");
+    resize(); // restore the full race area after removing the result panel
     updateTopBar();
     render();
   }

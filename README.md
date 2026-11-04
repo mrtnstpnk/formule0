@@ -64,6 +64,9 @@ point before the geometry changes; the race then continues in the new layout.
   still stop the stroke. Equal distances result in a draw.
 - Going backwards across a lap gate before finishing clears lap progress.
   Tap **Odveta** to play again.
+- The result appears beside the track in landscape or below it in portrait.
+  The road remains fully visible at normal brightness, including the final
+  strokes and car positions; the result panel has its own space.
 
 ## Running locally
 
