@@ -13,13 +13,20 @@ shared circuit geometry in `track/brno-circuit.js`. No frameworks or build step.
 
 - Players take turns. On your turn, draw **one fast stroke** with your
   finger (or mouse) to move your car.
-- Your stroke must start exactly where your car currently is — the very
+- Touch inside the circle around your car to start a stroke — the very
   first stroke of the game may start anywhere in the green start zone.
-- The stroke lasts about 0.8 seconds; a shrinking ring shows how much time
+- The stroke lasts about 0.5 seconds; a shrinking ring shows how much time
   is left. Going fast covers more ground but is riskier.
 - Touch a wall and you crash: the stroke is cut at the point of impact and
   the turn passes to the other player. Your next stroke starts from the
   crash point.
+- After a crash, the circle is centered on the wall and extends outside the
+  road. Its diameter matches the road width. Finger movement inside it is
+  tolerated. Leave the circle into the road to resume driving; leaving it
+  outside ends the turn at the original
+  crash point. Normal wall collisions resume immediately after the first
+  exit, including within the same fast movement. Releasing or running out
+  of time inside the circle leaves the car in place.
 - Stay inside the track and the turn simply passes after your stroke ends.
 - Follow the arrows clockwise around the entire circuit. The green start
   zone sits just before the shared start/finish line. Crossing it at the
@@ -47,8 +54,8 @@ node --test tests/collision.test.cjs
 ```
 
 These tests run the game's input handlers with a canvas stub and cover wall
-collisions, recovery after a crash, shortcuts, closed-wall geometry, and complete
-laps in portrait and landscape layouts. They also verify that the playable
+collisions, touch tolerance and recovery after a crash, shortcuts, closed-wall
+geometry, and complete laps in portrait and landscape layouts. They also verify that the playable
 walls exactly match the approved preview and that each lap gate has only one
 crossing of the circuit. No dependencies are required.
 

@@ -9,11 +9,12 @@ const html = fs.readFileSync(path.join(__dirname, "..", "index.html"), "utf8");
 const source = html.match(/<script>([\s\S]*?)<\/script>/)[1].replace(/\}\)\(\);\s*$/, `
   globalThis.testGame = {
     game, track, STATE, onPointerDown, onPointerMove, onPointerUp,
-    findNearestIntersection, pointInPolygon, pointInRoad, segIntersect, resetGame, dist
+    findNearestIntersection, pointInPolygon, pointInRoad, segIntersect, resetGame, dist, loop
   };
 })();`);
 
 function loadGame(width, height) {
+  let now = 0;
   const context = new Proxy({}, { get: () => () => {} });
   const makeElement = () => ({
     getContext: () => context,
@@ -32,10 +33,11 @@ function loadGame(width, height) {
       createElement: makeElement, addEventListener() {},
     },
     window: { devicePixelRatio: 1, addEventListener() {} },
-    navigator: {}, performance: { now: () => 0 }, requestAnimationFrame() {},
+    navigator: {}, performance: { now: () => now }, requestAnimationFrame() {},
   };
   vm.runInNewContext(source, sandbox);
   const api = sandbox.testGame;
+  api.elapse = ms => { now += ms; api.loop(); };
   api.game.hintDismissed = true;
   return api;
 }
@@ -68,6 +70,15 @@ function crashFromStart(api, side) {
   return { start, outside, crashPoint };
 }
 
+function wallStart(api, side, index = 40) {
+  const wall = midpoint(api.track[side][index], api.track[side][index + 1]);
+  const center = midpoint(api.track.centerline[index], api.track.centerline[index + 1]);
+  api.game.positions[0] = wall;
+  // Signed CSS-pixel distance from the wall, positive toward the road.
+  const at = distance => interpolate(wall, center, distance / api.dist(wall, center));
+  return { wall, center, at };
+}
+
 for (const [width, height] of [[390, 788], [1024, 712]]) {
   for (const side of ["left", "right"]) {
     const label = `${width}x${height}, ${side} wall`;
@@ -76,7 +87,8 @@ for (const [width, height] of [[390, 788], [1024, 712]]) {
       const api = loadGame(width, height);
       const { outside, crashPoint } = crashFromStart(api, side);
       begin(api, crashPoint);
-      move(api, outside);
+      const radius = api.game.currentStroke.startCircle.radius;
+      move(api, interpolate(crashPoint, outside, (radius + 5) / api.dist(crashPoint, outside)));
       assert.equal(api.game.state, api.STATE.WAITING_FOR_TOUCH);
       assert.equal(api.game.strokes.at(-1).crashed, true);
       assert(api.dist(api.game.positions[0], crashPoint) < 1e-7);
@@ -87,11 +99,207 @@ for (const [width, height] of [[390, 788], [1024, 712]]) {
       const { start, crashPoint } = crashFromStart(api, side);
       begin(api, crashPoint);
       move(api, crashPoint);
-      move(api, start);
+      // Move beyond the recovery circle but stay short of the opposite wall.
+      const radius = api.game.currentStroke.startCircle.radius;
+      const destination = interpolate(crashPoint, start, (radius + 1) / api.dist(crashPoint, start));
+      move(api, destination);
       assert.equal(api.game.state, api.STATE.DRAWING);
-      end(api, start);
+      end(api, destination);
       assert.equal(api.game.strokes.at(-1).crashed, false);
-      assert(api.dist(api.game.positions[0], start) < 1e-7);
+      assert(api.dist(api.game.positions[0], destination) < 1e-7);
+    });
+
+    test(`${label}: an off-road touch and jitter recover only after leaving the circle into the road`, () => {
+      const api = loadGame(width, height);
+      const { wall, at } = wallStart(api, side);
+      begin(api, at(-8));
+      const radius = api.game.currentStroke.startCircle.radius;
+      assert(Math.abs(radius * 2 - api.dist(api.track.left[40], api.track.right[40])) < 1e-7);
+      for (const offset of [-8, -10, 2, -4, radius - 0.1]) {
+        move(api, at(offset));
+        assert.equal(api.game.state, api.STATE.DRAWING);
+        assert.equal(api.game.currentStroke.points.length, 1);
+        assert(api.dist(api.game.positions[0], wall) < 1e-7);
+      }
+      const destination = at(radius + 1);
+      assert(api.pointInRoad(destination, api.track));
+      move(api, destination);
+      assert.equal(api.game.state, api.STATE.DRAWING);
+      assert.equal(api.game.currentStroke.startCircle, null);
+      end(api, destination);
+      assert.equal(api.game.strokes.at(-1).crashed, false);
+      assert(api.dist(api.game.positions[0], destination) < 1e-7);
+    });
+
+    test(`${label}: a touch at the outside rim can cross the entire circle in one event`, () => {
+      const api = loadGame(width, height);
+      const { wall, at } = wallStart(api, side);
+      begin(api, wall);
+      const radius = api.game.currentStroke.startCircle.radius;
+      api.resetGame();
+      api.game.positions[0] = wall;
+      begin(api, at(-radius + 1e-6));
+      assert.equal(api.game.state, api.STATE.DRAWING);
+      move(api, at(radius + 1));
+      assert.equal(api.game.state, api.STATE.DRAWING);
+      end(api, at(radius + 1));
+      assert.equal(api.game.strokes.at(-1).crashed, false);
+    });
+
+    test(`${label}: touching beyond the circle does not consume the turn`, () => {
+      const api = loadGame(width, height);
+      const { wall, at } = wallStart(api, side);
+      begin(api, wall);
+      const radius = api.game.currentStroke.startCircle.radius;
+      api.resetGame();
+      api.game.positions[0] = wall;
+      begin(api, at(-radius - 1));
+      assert.equal(api.game.state, api.STATE.WAITING_FOR_TOUCH);
+      assert.equal(api.game.currentPlayer, 0);
+      assert.equal(api.game.strokes.length, 0);
+    });
+
+    test(`${label}: slow outward movement is tolerated inside, then rejected at the first exit`, () => {
+      const api = loadGame(width, height);
+      const { wall, at } = wallStart(api, side);
+      begin(api, at(-3));
+      const radius = api.game.currentStroke.startCircle.radius;
+      for (let offset = 4; offset < radius; offset += 0.3) {
+        move(api, at(-offset));
+        assert.equal(api.game.state, api.STATE.DRAWING);
+      }
+      move(api, at(-radius - 0.1));
+      assert.equal(api.game.state, api.STATE.WAITING_FOR_TOUCH);
+      assert.equal(api.game.strokes.at(-1).crashed, true);
+      assert(api.dist(api.game.positions[0], wall) < 1e-7);
+    });
+
+    test(`${label}: release, cancel and timeout inside the circle keep the car on the wall`, () => {
+      for (const reason of ["release", "cancel", "timeout"]) {
+        const api = loadGame(width, height);
+        const { wall, at } = wallStart(api, side);
+        begin(api, at(-3));
+        move(api, at(-10));
+        if (reason === "timeout") api.elapse(501);
+        else api.onPointerUp({ ...pointer(at(-10)), type: reason === "cancel" ? "pointercancel" : "pointerup" });
+        assert.equal(api.game.state, api.STATE.WAITING_FOR_TOUCH);
+        assert.equal(api.game.currentPlayer, 1);
+        assert.equal(api.game.strokes.at(-1).crashed, false);
+        assert(api.dist(api.game.positions[0], wall) < 1e-7);
+        assert.equal(api.game.nextCheckpoint[0], 0);
+        passOpponent(api);
+        begin(api, at(-3));
+        assert(api.game.currentStroke.startCircle);
+      }
+    });
+
+    test(`${label}: pointerup validates a final movement out of the circle`, () => {
+      for (const direction of [-1, 1]) {
+        const api = loadGame(width, height);
+        const { wall, at } = wallStart(api, side);
+        begin(api, at(-3));
+        const destination = at(direction * (api.game.currentStroke.startCircle.radius + 1));
+        end(api, destination);
+        assert.equal(api.game.strokes.at(-1).crashed, direction < 0);
+        assert(api.dist(api.game.positions[0], direction < 0 ? wall : destination) < 1e-7);
+      }
+    });
+
+    test(`${label}: returning to the circle after a valid exit does not restore tolerance`, () => {
+      const api = loadGame(width, height);
+      const { wall, at } = wallStart(api, side);
+      begin(api, at(-3));
+      move(api, at(api.game.currentStroke.startCircle.radius + 1));
+      move(api, at(5));
+      assert.equal(api.game.state, api.STATE.DRAWING);
+      move(api, at(-1));
+      assert.equal(api.game.strokes.at(-1).crashed, true);
+      assert(api.dist(api.game.positions[0], wall) < 1e-7);
+    });
+
+    test(`${label}: a legal endpoint cannot hide an off-road first exit`, () => {
+      const api = loadGame(width, height);
+      begin(api, wallStart(api, side).wall);
+      const radius = api.game.currentStroke.startCircle.radius;
+      api.resetGame();
+      let wall, destination;
+      for (let index = 0; index < api.track.centerline.length; index += 12) {
+        wall = wallStart(api, side, index).wall;
+        destination = api.track.centerline.find(p => api.dist(wall, p) > radius * 2 &&
+          !api.pointInRoad(interpolate(wall, p, radius / api.dist(wall, p)), api.track));
+        if (destination) break;
+      }
+      assert(destination, "fixture must cross outside before reentering the road");
+      begin(api, wall);
+      move(api, destination);
+      assert.equal(api.game.strokes.at(-1).crashed, true);
+      assert(api.dist(api.game.positions[0], wall) < 1e-7);
+    });
+
+    test(`${label}: a long recovery still detects a later wall before a legal endpoint`, () => {
+      const api = loadGame(width, height);
+      begin(api, wallStart(api, side).wall);
+      const radius = api.game.currentStroke.startCircle.radius;
+      api.resetGame();
+      let wall, destination, expected;
+      for (let index = 0; index < api.track.centerline.length; index += 12) {
+        wall = wallStart(api, side, index).wall;
+        destination = api.track.centerline.find(p => {
+          if (api.dist(wall, p) <= radius * 2) return false;
+          const exit = interpolate(wall, p, radius / api.dist(wall, p));
+          if (!api.pointInRoad(exit, api.track)) return false;
+          expected = api.findNearestIntersection(exit, p, api.track.collisionSegments, api.track);
+          return expected && api.dist(expected, exit) > 1;
+        });
+        if (destination) break;
+      }
+      assert(destination, "fixture must exit into the road and hit a wall later");
+      begin(api, wall);
+      move(api, destination);
+      assert.equal(api.game.strokes.at(-1).crashed, true);
+      assert(api.dist(api.game.positions[0], expected) < 1e-7);
+    });
+
+    test(`${label}: the circle exit follows the actual offset finger path`, () => {
+      const api = loadGame(width, height);
+      const { wall, at } = wallStart(api, side, 0);
+      begin(api, wall);
+      const radius = api.game.currentStroke.startCircle.radius;
+      api.resetGame();
+      api.game.positions[0] = wall;
+      const a = api.track[side][0], b = api.track[side][1];
+      const length = api.dist(a, b);
+      const touch = at(-radius * 0.8);
+      const destination = {
+        x: at(2).x + (b.x - a.x) / length * radius * 2,
+        y: at(2).y + (b.y - a.y) / length * radius * 2,
+      };
+      const outside = midpoint(touch, destination);
+      assert(api.pointInRoad(destination, api.track));
+      assert(api.dist(outside, wall) > radius);
+      assert.equal(api.pointInRoad(outside, api.track), false);
+      begin(api, touch);
+      move(api, destination);
+      assert.equal(api.game.strokes.at(-1).crashed, true);
+      assert(api.dist(api.game.positions[0], wall) < 1e-7);
+    });
+
+    test(`${label}: a corner vertex allows recovery despite tiny rounding errors`, () => {
+      for (const rounding of [-1e-10, 1e-10]) {
+        const api = loadGame(width, height);
+        const index = api.track.turnIndices[0];
+        const vertex = api.track[side][index];
+        const center = api.track.centerline[index];
+        const origin = { x: vertex.x + rounding, y: vertex.y + rounding };
+        api.game.positions[0] = origin;
+        begin(api, origin);
+        const radius = api.game.currentStroke.startCircle.radius;
+        move(api, interpolate(vertex, center, -5 / api.dist(vertex, center)));
+        assert.equal(api.game.state, api.STATE.DRAWING);
+        move(api, interpolate(vertex, center, (radius + 1) / api.dist(vertex, center)));
+        assert.equal(api.game.state, api.STATE.DRAWING);
+        assert.equal(api.game.currentStroke.startCircle, null);
+      }
     });
 
     test(`${label}: first segment detects a wall only one pixel away`, () => {
@@ -131,6 +339,39 @@ for (const [width, height] of [[390, 788], [1024, 712]]) {
       }
     });
   }
+
+  test(`${width}x${height}: moving across a lap gate inside the circle grants no progress or win`, () => {
+    for (const gate of [api => api.track.finishSegment, api => api.track.checkpoints[0]]) {
+      const api = loadGame(width, height);
+      const index = gate(api).index;
+      const { wall } = wallStart(api, "left", (index + api.track.centerline.length - 2) % api.track.centerline.length);
+      api.game.nextCheckpoint[0] = api.track.checkpoints.length;
+      begin(api, wall);
+      const target = interpolate(api.track.left[index + 1], api.track.centerline[index + 1], 0.1);
+      assert(api.dist(target, wall) < api.game.currentStroke.startCircle.radius);
+      move(api, target);
+      assert.equal(api.game.winner, null);
+      assert.equal(api.game.nextCheckpoint[0], api.track.checkpoints.length);
+      end(api, target);
+      assert(api.dist(api.game.positions[0], wall) < 1e-7);
+    }
+  });
+
+  test(`${width}x${height}: recovery ignores extra fingers and is cleared by reset`, () => {
+    const api = loadGame(width, height);
+    const { wall, at } = wallStart(api, "left");
+    begin(api, at(-3));
+    const radius = api.game.currentStroke.startCircle.radius;
+    api.onPointerMove({ ...pointer(at(-radius - 1)), pointerId: 2 });
+    api.onPointerUp({ ...pointer(at(-radius - 1)), pointerId: 2 });
+    assert.equal(api.game.state, api.STATE.DRAWING);
+    assert(api.game.currentStroke.startCircle);
+    assert(api.dist(api.game.positions[0], wall) < 1e-7);
+    api.resetGame();
+    assert.equal(api.game.currentStroke, null);
+    begin(api, api.track.startPoint);
+    assert.equal(api.game.currentStroke.startCircle, null);
+  });
 
   test(`${width}x${height}: slow subpixel movement still crashes`, () => {
     const api = loadGame(width, height);

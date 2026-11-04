@@ -90,6 +90,7 @@
     <p>
       Take turns drawing <strong>one quick stroke</strong> with your finger to move your car.
       Begin in the green grid, then start each stroke where your car stopped.
+      After a crash, touch inside the circle and leave it toward the road.
       Stay inside the road &mdash;
       touch a wall and you crash! Follow the arrows around Brno and complete
       one full lap to win.
@@ -113,7 +114,7 @@
   // =========================================================================
   // CONFIG
   // =========================================================================
-  const STROKE_DURATION_MS = 800;      // how long a single turn's stroke lasts
+  const STROKE_DURATION_MS = 500;      // how long a single turn's stroke lasts
   const PLAYER_COLORS = ["#2563eb", "#dc2626"];   // player 1 blue, player 2 red
   const PLAYER_NAMES = ["Player 1", "Player 2"];
 
@@ -206,6 +207,25 @@
   function pointInRoad(pt, road) {
     // Two separate closed walls form a ring. Its infield is not driveable.
     return pointInPolygon(pt, road.left) !== pointInPolygon(pt, road.right);
+  }
+
+  function pointOnWall(pt, road) {
+    return road.wallSegments.some(seg => pointOnSegment(pt, seg.p1, seg.p2));
+  }
+
+  function startCircleRadius() {
+    return circuitPlan.width * track.scale / 2;
+  }
+
+  // The positive root is the exit from a circle when p1 is inside it.
+  function circleExit(p1, p2, center, radius) {
+    const dx = p2.x - p1.x, dy = p2.y - p1.y;
+    const ox = p1.x - center.x, oy = p1.y - center.y;
+    const a = dx * dx + dy * dy;
+    const b = 2 * (ox * dx + oy * dy);
+    const c = ox * ox + oy * oy - radius * radius;
+    const t = clamp((-b + Math.sqrt(Math.max(0, b * b - 4 * a * c))) / (2 * a), 0, 1);
+    return { x: p1.x + t * dx, y: p1.y + t * dy };
   }
 
   // A car on a wall may leave it only toward the road. Test the interval
@@ -414,6 +434,26 @@
     ctx.clearRect(0, 0, W, H);
     if (staticLayer) ctx.drawImage(staticLayer, 0, 0, W, H);
 
+    // Show the accepted touch area. At a wall it also marks the one-time
+    // recovery area, which stays visible until the finger first leaves it.
+    const startCircle = game.currentStroke && game.currentStroke.startCircle;
+    const startCenter = startCircle ? startCircle.center :
+      game.state === STATE.WAITING_FOR_TOUCH ? game.positions[game.currentPlayer] : null;
+    if (startCenter) {
+      ctx.save();
+      ctx.beginPath();
+      ctx.arc(startCenter.x, startCenter.y, startCircleRadius(), 0, Math.PI * 2);
+      ctx.fillStyle = PLAYER_COLORS[game.currentPlayer];
+      ctx.globalAlpha = 0.12;
+      ctx.fill();
+      ctx.globalAlpha = 0.75;
+      ctx.lineWidth = 2;
+      ctx.setLineDash([5, 4]);
+      ctx.strokeStyle = PLAYER_COLORS[game.currentPlayer];
+      ctx.stroke();
+      ctx.restore();
+    }
+
     const strokeWidth = clamp(track ? track.minDim * 0.013 : 5, 3, 8);
 
     // committed strokes
@@ -498,14 +538,17 @@
     if (required === null) {
       if (!pointInPolygon(pos, track.startZonePolygon) || !pointInRoad(pos, track)) return;
     } else {
-      const tolerance = clamp(track.minDim * 0.06, 24, 60);
-      if (dist(pos, required) > tolerance) return; // ignored: too far from car
+      if (dist(pos, required) > startCircleRadius()) return; // ignored: too far from car
     }
 
     const startPoint = required === null ? pos : { x: required.x, y: required.y }; // snap exactly
 
     game.state = STATE.DRAWING;
-    game.currentStroke = { player: game.currentPlayer, points: [startPoint] };
+    game.currentStroke = {
+      player: game.currentPlayer, points: [startPoint],
+      startCircle: required !== null && pointOnWall(required, track) ?
+        { center: startPoint, radius: startCircleRadius(), lastPointer: pos } : null,
+    };
     game.strokeStartTime = performance.now();
     game.activePointerId = e.pointerId;
     try { canvas.setPointerCapture(e.pointerId); } catch (err) { /* no-op */ }
@@ -517,7 +560,31 @@
 
     const pos = getRelativePos(e);
     const stroke = game.currentStroke;
-    const from = stroke.points[stroke.points.length - 1];
+    let from = stroke.points[stroke.points.length - 1];
+    if (stroke.startCircle) {
+      const circle = stroke.startCircle;
+      const previous = circle.lastPointer;
+      circle.lastPointer = pos;
+      // Jitter on either side of the curb neither moves the car nor crashes.
+      if (dist(pos, circle.center) <= circle.radius) return;
+
+      const exit = circleExit(previous, pos, circle.center, circle.radius);
+      stroke.startCircle = null; // never restore tolerance later in this turn
+      if (!pointInRoad(exit, track) || pointOnWall(exit, track)) {
+        endStroke("crash"); // keep the car at the original wall, not outside it
+        return;
+      }
+
+      // Commit the local recovery only after a valid exit. Still check the
+      // rest of this same pointer segment, even if its endpoint is on road.
+      const finish = advanceLap(from, exit, null);
+      stroke.points.push(finish ? { x: finish.x, y: finish.y } : exit);
+      if (finish) {
+        endStroke("win");
+        return;
+      }
+      from = exit;
+    }
     if (dist(from, pos) <= GEOMETRY_EPSILON) return;
 
     const hit = findNearestIntersection(from, pos, track.collisionSegments, track);
@@ -538,6 +605,9 @@
   function onPointerUp(e) {
     if (game.state !== STATE.DRAWING) return;
     if (e.pointerId !== game.activePointerId) return;
+    // Touch devices can deliver the last movement only with pointerup.
+    if (e.type !== "pointercancel") onPointerMove(e);
+    if (game.state !== STATE.DRAWING) return;
     endStroke("normal");
   }
 
