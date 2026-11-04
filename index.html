@@ -1,9 +1,9 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="cs">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, minimum-scale=1, user-scalable=no, viewport-fit=cover">
-<title>Formule &mdash; Brno Circuit</title>
+<title>Formule0 — Závody jedním tahem</title>
 <style>
   * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
   html, body {
@@ -11,7 +11,7 @@
     overflow: hidden; overscroll-behavior: none;
     background: #0f172a;
     font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-    touch-action: none;
+    touch-action: auto;
     user-select: none; -webkit-user-select: none; -webkit-touch-callout: none;
   }
 
@@ -70,41 +70,133 @@
   }
   #rematchBtn:active { background: #1d4ed8; }
 </style>
+<link rel="stylesheet" href="menu.css">
 </head>
 <body>
 
+  <svg xmlns="http://www.w3.org/2000/svg" hidden aria-hidden="true">
+    <symbol id="icon-play" viewBox="0 0 24 24"><path d="M7 4.5v15L20 12z"/></symbol>
+    <symbol id="icon-settings" viewBox="0 0 24 24"><path d="m9 3-.6 2.5-2 .9L4 5.7 2.5 8.3l1.8 1.8v2.3l-1.8 1.8L4 17l2.4-.7 2 .9L9 20h3l.6-2.8 2-.9 2.4.7 1.5-2.8-1.8-1.8v-2.3l1.8-1.8L17 5.7l-2.4.7-2-.9L12 3z"/><circle cx="10.5" cy="11.5" r="3"/></symbol>
+    <symbol id="icon-info" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 11v6M12 7v.1"/></symbol>
+    <symbol id="icon-back" viewBox="0 0 24 24"><path d="m10 5-7 7 7 7M3 12h18"/></symbol>
+  </svg>
+
+  <main id="homeScreen" class="screen" aria-labelledby="homeTitle">
+    <div class="screen-inner">
+      <header class="menu-header">
+        <div class="brand"><span class="brand-mark" aria-hidden="true">F0</span><span class="brand-caption">Závody jedním tahem</span></div>
+        <span class="players-pill"><span class="player-pair" aria-hidden="true"><i></i><i></i></span>2 hráči · 1 zařízení</span>
+      </header>
+      <div class="home-layout">
+        <section class="home-intro">
+          <p class="eyebrow">Papírová klasika. Nová startovní čára.</p>
+          <h1 id="homeTitle" class="home-title">FORMULE<span>0</span></h1>
+          <p class="home-lead">Rychlý tah. Přesná stopa.<br> Souboj o poslední zatáčku.</p>
+          <nav class="menu-actions" aria-label="Hlavní menu">
+            <button id="resumeBtn" class="menu-button button-primary" hidden><svg class="icon icon-play" aria-hidden="true"><use href="#icon-play"/></svg>Pokračovat v závodě</button>
+            <button id="playBtn" class="menu-button button-primary"><svg class="icon icon-play" aria-hidden="true"><use href="#icon-play"/></svg>Nový závod</button>
+            <div class="secondary-actions">
+              <button id="settingsBtn" class="menu-button"><svg class="icon" aria-hidden="true"><use href="#icon-settings"/></svg>Nastavení</button>
+              <button id="aboutBtn" class="menu-button"><svg class="icon" aria-hidden="true"><use href="#icon-info"/></svg>O hře</button>
+            </div>
+          </nav>
+          <p class="local-note">Vyzvi soupeře. Stačí jeden telefon a dva prsty.</p>
+        </section>
+        <section class="circuit-card" aria-label="Brněnský okruh">
+          <div class="circuit-card-header"><p class="eyebrow">Brněnský okruh</p><span class="track-tag">PŘIPRAVEN NA START</span></div>
+          <div class="circuit-art" aria-hidden="true">
+            <svg id="menuCircuit" viewBox="-90 -70 1310 860">
+              <path id="menuCircuitOutline" class="circuit-outline"/>
+              <path id="menuCircuitBlue" class="circuit-trace" pathLength="100"/>
+              <path id="menuCircuitRed" class="circuit-trace circuit-trace-red" pathLength="100"/>
+            </svg>
+          </div>
+          <div class="circuit-stats">
+            <div class="circuit-stat"><strong>14</strong><span>zatáček</span></div>
+            <div class="circuit-stat"><strong>1</strong><span>vítězné kolo</span></div>
+            <div class="circuit-stat"><strong id="homeDuration">500 ms</strong><span>na jeden tah</span></div>
+          </div>
+        </section>
+      </div>
+      <footer class="menu-footer"><span><i class="footer-flag" aria-hidden="true"></i>Malý okruh. Velká rivalita.</span><span>Prstem i myší. Bez instalace.</span></footer>
+    </div>
+  </main>
+
+  <section id="settingsScreen" class="screen" aria-labelledby="settingsTitle" hidden>
+    <div class="screen-inner detail-inner">
+      <button id="settingsBackBtn" class="back-button"><svg class="icon" aria-hidden="true"><use href="#icon-back"/></svg>Zpět do menu</button>
+      <header class="page-heading"><p class="eyebrow">Po tvém</p><h1 id="settingsTitle" tabindex="-1">Nastavení</h1><p>Vylaď si závod před dalším startem.</p></header>
+      <div class="settings-card">
+        <div class="setting-row">
+          <label class="setting-copy" for="durationSetting"><strong>Délka tahu</strong><small>Kratší čas znamená svižnější souboj.</small></label>
+          <select id="durationSetting"><option value="300">300 ms</option><option value="500" selected>500 ms</option><option value="800">800 ms</option><option value="1000">1 000 ms</option></select>
+        </div>
+        <div class="setting-row">
+          <label class="setting-copy" for="vibrationSetting"><strong>Vibrace při nárazu</strong><small>Na zařízeních, která vibrace podporují.</small></label>
+          <label class="toggle"><input id="vibrationSetting" type="checkbox" checked></label>
+        </div>
+        <div class="setting-row">
+          <label class="setting-copy" for="timerSetting"><strong>Odpočet u tahu</strong><small>Kroužek ukazuje zbývající čas.</small></label>
+          <label class="toggle"><input id="timerSetting" type="checkbox" checked></label>
+        </div>
+        <div class="setting-row">
+          <label class="setting-copy" for="hintSetting"><strong>Nápověda před závodem</strong><small>Krátké připomenutí pravidel při novém startu.</small></label>
+          <label class="toggle"><input id="hintSetting" type="checkbox" checked></label>
+        </div>
+      </div>
+      <div class="settings-footer"><p id="settingsStatus" class="settings-status" role="status">Nastavení se ukládá v tomto zařízení.</p><button id="defaultsBtn" class="text-button">Obnovit výchozí</button></div>
+    </div>
+  </section>
+
+  <section id="aboutScreen" class="screen" aria-labelledby="aboutTitle" hidden>
+    <div class="screen-inner detail-inner">
+      <button id="aboutBackBtn" class="back-button"><svg class="icon" aria-hidden="true"><use href="#icon-back"/></svg>Zpět do menu</button>
+      <header class="page-heading"><p class="eyebrow">Seznam se s okruhem</p><h1 id="aboutTitle" tabindex="-1">O hře</h1><p>Papírové závody pro dva. Jeden brněnský okruh.</p></header>
+      <article class="about-card">
+        <h2>Jak se závodí</h2>
+        <ol class="how-to">
+          <li><div><strong>Střídejte se v tazích</strong><p>Každý hráč kreslí jednu rychlou čáru prstem nebo myší. První tah začíná v zeleném startovním poli, další u vlastní poslední pozice. Na tah máš <span id="aboutDuration">500 ms</span>.</p></div></li>
+          <li><div><strong>Drž se mezi obrubníky</strong><p>Náraz ukončí tah na okraji dráhy. Příště začni kdekoliv v kroužku kolem auta, klidně i za obrubníkem. Z kroužku musíš vyjet dovnitř dráhy.</p></div></li>
+          <li><div><strong>Dokonči celé kolo</strong><p>Jeď po směru šipek, projeď celý okruh a jako první překroč cílovou čáru. Zkratky ani jízda v protisměru k vítězství nevedou.</p></div></li>
+        </ol>
+      </article>
+      <p class="about-note">Formule0 převádí klasickou hru s tužkou a papírem na společnou obrazovku. Trať je inspirovaná Automotodromem Brno a má 14 zatáček.<br><a href="https://github.com/mrtnstpnk/formule0" target="_blank" rel="noopener noreferrer">Projekt na GitHubu ↗</a></p>
+    </div>
+  </section>
+
+  <section id="raceScreen" class="race-screen" aria-label="Závod" aria-hidden="true" inert>
   <div id="topbar">
     <div id="turnIndicator">
       <div id="turnDot"></div>
-      <span id="turnLabel">Player 1</span>
+      <span id="turnLabel">Na tahu: Hráč 1</span>
     </div>
-    <button id="restartBtn">Restart</button>
+    <div class="topbar-actions"><button id="menuBtn" class="topbar-button">Menu</button><button id="restartBtn">Restart</button></div>
   </div>
 
   <div id="canvasWrap">
-    <canvas id="track"></canvas>
+    <canvas id="track" tabindex="0" aria-label="Závodní dráha. Kresli tahy prstem nebo myší."></canvas>
   </div>
 
   <div id="hint">
-    <h2>How to Race</h2>
+    <h2>Na start, připravit…</h2>
     <p>
-      Take turns drawing <strong>one quick stroke</strong> with your finger to move your car.
-      Begin in the green grid, then start each stroke where your car stopped.
-      After a crash, touch inside the circle and leave it toward the road.
-      Stay inside the road &mdash;
-      touch a wall and you crash! Follow the arrows around Brno and complete
-      one full lap to win.
+      Střídejte se a kreslete <strong>jeden rychlý tah</strong> prstem nebo myší.
+      Začněte v zeleném poli. Na každý tah máte <strong id="hintDuration">500 ms</strong>.
+      Po nárazu začněte uvnitř kroužku a vyjeďte z něj do dráhy.
+      První, kdo po směru šipek dokončí celé kolo, vítězí.
     </p>
-    <div class="tapHint">Tap anywhere to begin</div>
+    <button id="dismissHintBtn" class="menu-button button-primary">Rozumím, jdeme závodit</button>
   </div>
 
   <div id="flash"></div>
 
   <div id="victory">
     <div class="medal">&#127942;</div>
-    <h1 id="victoryText">Player 1 Wins!</h1>
-    <button id="rematchBtn">Rematch</button>
+    <h1 id="victoryText">Hráč 1 vítězí!</h1>
+    <button id="rematchBtn">Odveta</button>
+    <button id="victoryMenuBtn" class="victory-menu">Zpět do menu</button>
   </div>
+  </section>
 
 <script src="track/brno-circuit.js"></script>
 <script>
@@ -116,7 +208,25 @@
   // =========================================================================
   const STROKE_DURATION_MS = 500;      // how long a single turn's stroke lasts
   const PLAYER_COLORS = ["#2563eb", "#dc2626"];   // player 1 blue, player 2 red
-  const PLAYER_NAMES = ["Player 1", "Player 2"];
+  const PLAYER_NAMES = ["Hráč 1", "Hráč 2"];
+  const SETTINGS_KEY = "formule0.settings.v1";
+  const TURN_DURATIONS = [300, 500, 800, 1000];
+  const DEFAULT_SETTINGS = { strokeDurationMs: STROKE_DURATION_MS, vibration: true, showTimer: true, showHint: true };
+
+  function loadSettings() {
+    let saved;
+    try { saved = JSON.parse(localStorage.getItem(SETTINGS_KEY)); } catch (err) { /* storage may be unavailable */ }
+    const result = { ...DEFAULT_SETTINGS };
+    if (!saved || typeof saved !== "object") return result;
+    if (TURN_DURATIONS.includes(saved.strokeDurationMs)) result.strokeDurationMs = saved.strokeDurationMs;
+    for (const key of ["vibration", "showTimer", "showHint"]) {
+      if (typeof saved[key] === "boolean") result[key] = saved[key];
+    }
+    return result;
+  }
+
+  const settings = loadSettings();
+  const app = { screen: "home", raceStarted: false };
 
   // =========================================================================
   // GAME STATE MACHINE
@@ -133,6 +243,7 @@
     crashMarkers: [],                 // {x,y} visual crash markers
     currentStroke: null,              // in-progress stroke: {player, points:[{x,y}]}
     strokeStartTime: 0,
+    strokeDurationMs: settings.strokeDurationMs,
     activePointerId: null,
     winner: null,
     hintDismissed: false,
@@ -155,6 +266,93 @@
   const victoryEl = document.getElementById("victory");
   const victoryText = document.getElementById("victoryText");
   const rematchBtn = document.getElementById("rematchBtn");
+  const raceScreen = document.getElementById("raceScreen");
+  const panels = {
+    home: document.getElementById("homeScreen"),
+    settings: document.getElementById("settingsScreen"),
+    about: document.getElementById("aboutScreen"),
+  };
+
+  // =========================================================================
+  // MENUS / LOCAL SETTINGS
+  // =========================================================================
+
+  function updateHomeActions() {
+    const canResume = app.raceStarted && game.state !== STATE.GAME_OVER;
+    document.getElementById("resumeBtn").hidden = !canResume;
+    document.getElementById("playBtn").classList.toggle("is-secondary", canResume);
+  }
+
+  function showScreen(name, moveFocus = true) {
+    // Finish an interrupted stroke at its last accepted point. No timer or
+    // pointer capture remains active behind a menu.
+    if (name !== "race" && game.currentStroke) endStroke("normal");
+    app.screen = name;
+    for (const key of Object.keys(panels)) panels[key].hidden = key !== name;
+    raceScreen.setAttribute("aria-hidden", String(name !== "race"));
+    raceScreen.inert = name !== "race";
+    updateHomeActions();
+    if (!moveFocus) return;
+    if (panels[name]) panels[name].scrollTop = 0;
+    const target = name === "race" ? (game.hintDismissed ? canvas : document.getElementById("dismissHintBtn")) :
+      name === "home" ? document.getElementById(document.getElementById("resumeBtn").hidden ? "playBtn" : "resumeBtn") :
+      document.getElementById(name === "settings" ? "settingsTitle" : "aboutTitle");
+    target.focus({ preventScroll: true });
+  }
+
+  function startRace() {
+    resetGame();
+    app.raceStarted = true;
+    game.hintDismissed = !settings.showHint;
+    hintEl.hidden = game.hintDismissed;
+    showScreen("race");
+  }
+
+  function updateSettingsUI() {
+    document.getElementById("durationSetting").value = String(settings.strokeDurationMs);
+    for (const [id, key] of [["vibrationSetting", "vibration"], ["timerSetting", "showTimer"], ["hintSetting", "showHint"]]) {
+      document.getElementById(id).checked = settings[key];
+    }
+    for (const id of ["homeDuration", "aboutDuration", "hintDuration"]) {
+      document.getElementById(id).textContent = settings.strokeDurationMs + " ms";
+    }
+  }
+
+  function saveSettings() {
+    const status = document.getElementById("settingsStatus");
+    try {
+      localStorage.setItem(SETTINGS_KEY, JSON.stringify(settings));
+      status.textContent = "Nastavení je uložené v tomto zařízení.";
+    } catch (err) {
+      status.textContent = "Nastavení platí pro toto spuštění hry.";
+    }
+    updateSettingsUI();
+  }
+
+  document.getElementById("playBtn").addEventListener("click", startRace);
+  document.getElementById("resumeBtn").addEventListener("click", () => showScreen("race"));
+  document.getElementById("settingsBtn").addEventListener("click", () => showScreen("settings"));
+  document.getElementById("aboutBtn").addEventListener("click", () => showScreen("about"));
+  for (const id of ["settingsBackBtn", "aboutBackBtn", "menuBtn", "victoryMenuBtn"]) {
+    document.getElementById(id).addEventListener("click", () => showScreen("home"));
+  }
+  document.getElementById("durationSetting").addEventListener("change", function () {
+    const value = Number(this.value);
+    if (TURN_DURATIONS.includes(value)) settings.strokeDurationMs = value;
+    saveSettings();
+  });
+  for (const [id, key] of [["vibrationSetting", "vibration"], ["timerSetting", "showTimer"], ["hintSetting", "showHint"]]) {
+    document.getElementById(id).addEventListener("change", function () { settings[key] = this.checked; saveSettings(); });
+  }
+  document.getElementById("defaultsBtn").addEventListener("click", function () {
+    Object.assign(settings, DEFAULT_SETTINGS);
+    saveSettings();
+  });
+  document.addEventListener("keydown", function (e) {
+    if (e.key !== "Escape") return;
+    if (app.screen !== "home") showScreen("home");
+    else if (app.raceStarted && game.state !== STATE.GAME_OVER) showScreen("race");
+  });
 
   let dpr = Math.max(1, window.devicePixelRatio || 1);
   let W = 0, H = 0; // canvas CSS-pixel dimensions
@@ -262,6 +460,10 @@
 
   // The game and the approved design preview share these exact boundaries.
   const circuitPlan = BrnoCircuit.buildGeometry();
+  const circuitPath = circuitPlan.sections.map((s, i) => `${i === 0 ? "M" : "L"}${s.center.x.toFixed(2)},${s.center.y.toFixed(2)}`).join(" ") + " Z";
+  for (const id of ["menuCircuitOutline", "menuCircuitBlue", "menuCircuitRed"]) {
+    document.getElementById(id).setAttribute("d", circuitPath);
+  }
 
   function generateTrack(width, height) {
     const minDim = Math.min(width, height);
@@ -469,7 +671,7 @@
     // in-progress stroke
     if (game.currentStroke) {
       drawStroke(ctx, game.currentStroke, PLAYER_COLORS[game.currentStroke.player], strokeWidth);
-      drawTimeIndicator();
+      if (settings.showTimer) drawTimeIndicator();
     }
 
     // player position dots (where the next stroke must begin)
@@ -505,7 +707,7 @@
     if (!stroke || stroke.points.length === 0) return;
     const last = stroke.points[stroke.points.length - 1];
     const elapsed = performance.now() - game.strokeStartTime;
-    const remaining = clamp(1 - elapsed / STROKE_DURATION_MS, 0, 1);
+    const remaining = clamp(1 - elapsed / game.strokeDurationMs, 0, 1);
     const maxR = clamp(track.minDim * 0.05, 18, 40);
     ctx.save();
     ctx.beginPath();
@@ -528,6 +730,7 @@
   }
 
   function onPointerDown(e) {
+    if (app.screen !== "race") return;
     if (!game.hintDismissed) return; // hint overlay eats the very first touch
     if (game.state === STATE.GAME_OVER) return;
     if (game.state === STATE.DRAWING) return; // ignore extra fingers
@@ -550,6 +753,7 @@
         { center: startPoint, radius: startCircleRadius(), lastPointer: pos } : null,
     };
     game.strokeStartTime = performance.now();
+    game.strokeDurationMs = settings.strokeDurationMs;
     game.activePointerId = e.pointerId;
     try { canvas.setPointerCapture(e.pointerId); } catch (err) { /* no-op */ }
   }
@@ -617,12 +821,13 @@
   window.addEventListener("pointercancel", onPointerUp);
 
   // Belt-and-suspenders against page scroll/zoom/rubber-banding on iOS.
-  document.addEventListener("touchmove", function (e) { e.preventDefault(); }, { passive: false });
-  document.addEventListener("gesturestart", function (e) { e.preventDefault(); });
+  document.addEventListener("touchmove", function (e) { if (app.screen === "race") e.preventDefault(); }, { passive: false });
+  document.addEventListener("gesturestart", function (e) { if (app.screen === "race") e.preventDefault(); });
 
-  hintEl.addEventListener("pointerdown", function () {
+  document.getElementById("dismissHintBtn").addEventListener("click", function () {
     game.hintDismissed = true;
-    hintEl.style.display = "none";
+    hintEl.hidden = true;
+    canvas.focus({ preventScroll: true });
   });
 
   // =========================================================================
@@ -658,6 +863,8 @@
 
   function endStroke(reason) {
     const stroke = game.currentStroke;
+    try { canvas.releasePointerCapture(game.activePointerId); } catch (err) { /* pointer may already be released */ }
+    game.activePointerId = null;
     const lastPoint = stroke.points[stroke.points.length - 1];
     stroke.crashed = (reason === "crash");
     game.strokes.push(stroke);
@@ -675,7 +882,7 @@
     if (reason === "crash") {
       game.crashMarkers.push({ x: lastPoint.x, y: lastPoint.y });
       flashScreen();
-      if (navigator.vibrate) navigator.vibrate(80);
+      if (settings.vibration && navigator.vibrate) navigator.vibrate(80);
     }
 
     game.currentStroke = null;
@@ -700,14 +907,14 @@
     const p = game.currentPlayer;
     turnDot.style.background = PLAYER_COLORS[p];
     turnDot.style.color = PLAYER_COLORS[p];
-    turnLabel.textContent = PLAYER_NAMES[p] + "'s turn";
+    turnLabel.textContent = "Na tahu: " + PLAYER_NAMES[p];
   }
 
   function showVictory(player) {
     turnDot.style.background = PLAYER_COLORS[player];
     turnDot.style.color = PLAYER_COLORS[player];
-    turnLabel.textContent = PLAYER_NAMES[player] + " wins!";
-    victoryText.textContent = PLAYER_NAMES[player] + " Wins!";
+    turnLabel.textContent = PLAYER_NAMES[player] + " vítězí!";
+    victoryText.textContent = PLAYER_NAMES[player] + " vítězí!";
     victoryText.style.color = PLAYER_COLORS[player];
     victoryEl.classList.add("show");
   }
@@ -728,8 +935,8 @@
     render();
   }
 
-  restartBtn.addEventListener("pointerdown", function (e) { e.stopPropagation(); resetGame(); });
-  rematchBtn.addEventListener("pointerdown", function (e) { e.stopPropagation(); resetGame(); });
+  restartBtn.addEventListener("click", startRace);
+  rematchBtn.addEventListener("click", startRace);
 
   // =========================================================================
   // INIT / RESIZE / MAIN LOOP
@@ -755,17 +962,19 @@
   });
 
   function loop() {
-    if (game.state === STATE.DRAWING) {
+    if (app.screen === "race" && game.state === STATE.DRAWING) {
       const elapsed = performance.now() - game.strokeStartTime;
-      if (elapsed >= STROKE_DURATION_MS) {
+      if (elapsed >= game.strokeDurationMs) {
         endStroke("normal"); // time's up -- stroke ends where the finger currently is
       }
     }
-    render();
+    if (app.screen === "race") render();
     requestAnimationFrame(loop);
   }
 
   resize();
+  updateSettingsUI();
+  showScreen("home", false);
   updateTopBar();
   requestAnimationFrame(loop);
 })();

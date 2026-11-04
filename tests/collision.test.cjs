@@ -9,18 +9,19 @@ const html = fs.readFileSync(path.join(__dirname, "..", "index.html"), "utf8");
 const source = html.match(/<script>([\s\S]*?)<\/script>/)[1].replace(/\}\)\(\);\s*$/, `
   globalThis.testGame = {
     game, track, STATE, onPointerDown, onPointerMove, onPointerUp,
-    findNearestIntersection, pointInPolygon, pointInRoad, segIntersect, resetGame, dist, loop
+    findNearestIntersection, pointInPolygon, pointInRoad, segIntersect, resetGame, dist, loop,
+    app, settings, startRace, showScreen
   };
 })();`);
 
-function loadGame(width, height) {
+function loadGame(width, height, { start = true, savedSettings = null } = {}) {
   let now = 0;
   const context = new Proxy({}, { get: () => () => {} });
   const makeElement = () => ({
     getContext: () => context,
     getBoundingClientRect: () => ({ left: 0, top: 0, width, height }),
-    addEventListener() {}, setPointerCapture() {},
-    style: {}, classList: { add() {}, remove() {} },
+    addEventListener() {}, setPointerCapture() {}, focus() {}, setAttribute() {},
+    style: {}, classList: { add() {}, remove() {}, toggle() {} },
   });
   const elements = new Map();
   const sandbox = {
@@ -35,10 +36,15 @@ function loadGame(width, height) {
     window: { devicePixelRatio: 1, addEventListener() {} },
     navigator: {}, performance: { now: () => now }, requestAnimationFrame() {},
   };
+  if (savedSettings !== null) sandbox.localStorage = { getItem: () => savedSettings };
   vm.runInNewContext(source, sandbox);
   const api = sandbox.testGame;
+  api.element = id => elements.get(id);
   api.elapse = ms => { now += ms; api.loop(); };
-  api.game.hintDismissed = true;
+  if (start) {
+    api.startRace();
+    api.game.hintDismissed = true;
+  }
   return api;
 }
 
@@ -78,6 +84,95 @@ function wallStart(api, side, index = 40) {
   const at = distance => interpolate(wall, center, distance / api.dist(wall, center));
   return { wall, center, at };
 }
+
+test("home, settings and about screens cannot accidentally start a racing turn", () => {
+  const api = loadGame(390, 788, { start: false });
+  assert.equal(api.app.screen, "home");
+  assert.equal(api.app.raceStarted, false);
+  assert.equal(api.element("resumeBtn").hidden, true);
+  api.game.hintDismissed = true;
+  for (const screen of ["home", "settings", "about"]) {
+    api.showScreen(screen);
+    begin(api, api.track.startPoint);
+    assert.equal(api.game.state, api.STATE.WAITING_FOR_TOUCH);
+    assert.equal(api.game.currentStroke, null);
+    assert.equal(api.game.currentPlayer, 0);
+  }
+});
+
+test("opening the menu commits an active stroke and resuming preserves the race", () => {
+  const api = loadGame(390, 788);
+  begin(api, api.track.startPoint);
+  move(api, api.track.centerline.at(-7));
+  api.showScreen("home");
+  assert.equal(api.game.currentStroke, null);
+  assert.equal(api.game.currentPlayer, 1);
+  assert.equal(api.element("resumeBtn").hidden, false);
+  const position = api.game.positions[0];
+  api.elapse(2000);
+  assert.equal(api.game.strokes.length, 1);
+  api.showScreen("settings");
+  api.showScreen("about");
+  api.showScreen("race");
+  assert.equal(api.game.positions[0], position);
+  assert.equal(api.game.currentPlayer, 1);
+});
+
+for (const duration of [300, 500, 800, 1000]) {
+  test(`selected ${duration} ms duration ends the turn at its deadline and is fixed for that stroke`, () => {
+    const api = loadGame(390, 788);
+    api.settings.strokeDurationMs = duration;
+    begin(api, api.track.startPoint);
+    assert.equal(api.game.strokeDurationMs, duration);
+    api.settings.strokeDurationMs = 1000;
+    api.elapse(duration - 1);
+    assert.equal(api.game.state, api.STATE.DRAWING);
+    api.elapse(1);
+    assert.equal(api.game.state, api.STATE.WAITING_FOR_TOUCH);
+    assert.equal(api.game.currentPlayer, 1);
+    assert.equal(api.game.strokes[0].crashed, false);
+  });
+}
+
+test("a new race clears progress and uses the chosen hint preference", () => {
+  const api = loadGame(390, 788);
+  begin(api, api.track.startPoint);
+  end(api, api.track.startPoint);
+  api.game.nextCheckpoint[0] = 2;
+  api.settings.showHint = false;
+  api.settings.strokeDurationMs = 800;
+  api.startRace();
+  assert.equal(api.game.currentPlayer, 0);
+  assert.equal(api.game.positions[0], null);
+  assert.equal(api.game.strokes.length, 0);
+  assert.equal(api.game.nextCheckpoint[0], 0);
+  assert.equal(api.settings.strokeDurationMs, 800);
+  assert.equal(api.game.hintDismissed, true);
+  api.settings.showHint = true;
+  api.startRace();
+  assert.equal(api.game.hintDismissed, false);
+});
+
+test("malformed or unsupported saved settings fall back to valid defaults", () => {
+  for (const savedSettings of ["{bad json", "null", '{"strokeDurationMs":1,"showHint":"false","vibration":0}']) {
+    const api = loadGame(390, 788, { start: false, savedSettings });
+    assert.equal(api.settings.strokeDurationMs, 500);
+    assert.equal(api.settings.showHint, true);
+    assert.equal(api.settings.vibration, true);
+  }
+  const api = loadGame(390, 788, { start: false, savedSettings: '{"strokeDurationMs":800,"showHint":false,"vibration":false,"showTimer":false}' });
+  assert.equal(api.settings.strokeDurationMs, 800);
+  assert.equal(api.settings.showHint, false);
+  assert.equal(api.settings.vibration, false);
+  assert.equal(api.settings.showTimer, false);
+});
+
+test("a finished race offers a new start instead of continuing the finished race", () => {
+  const api = loadGame(390, 788);
+  api.game.state = api.STATE.GAME_OVER;
+  api.showScreen("home");
+  assert.equal(api.element("resumeBtn").hidden, true);
+});
 
 for (const [width, height] of [[390, 788], [1024, 712]]) {
   for (const side of ["left", "right"]) {

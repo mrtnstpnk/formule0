@@ -6,8 +6,26 @@ stroke per turn to move their car around a closed circuit shaped like the
 modern Automotodrom Brno. Cross a wall and you crash; complete one clockwise
 lap and cross the finish line first to win.
 
-Buildless browser game: `index.html` with inline CSS/JS, HTML5 canvas, and
+Buildless browser game: `index.html`, `menu.css`, HTML5 canvas, and
 shared circuit geometry in `track/brno-circuit.js`. No frameworks or build step.
+
+## Main menu and settings
+
+The Czech-language home screen opens before the race. Choose **Nový závod**
+to start, **Nastavení** to adjust the game, or **O hře** for rules and game
+information. The home screen previews the same Brno circuit used in the race.
+
+Settings include turn duration (300, 500, 800 or 1000 ms), crash vibration,
+the visual countdown and the pre-race hint. The default remains 500 ms.
+Changes save automatically in this browser, with an **Obnovit výchozí**
+button to restore defaults. If browser storage is unavailable, settings
+still work for the current session.
+
+During a race, **Menu** returns home and **Pokračovat v závodě** resumes it.
+Opening the menu during a stroke commits that stroke at its last accepted
+point and ends the turn; the timer does not run behind the menu. **Nový závod**
+and **Restart** clear the race. Escape returns to the menu or resumes a race
+from home. Rotating or resizing the game resets the circuit as before.
 
 ## How to play
 
@@ -15,7 +33,7 @@ shared circuit geometry in `track/brno-circuit.js`. No frameworks or build step.
   finger (or mouse) to move your car.
 - Touch inside the circle around your car to start a stroke — the very
   first stroke of the game may start anywhere in the green start zone.
-- The stroke lasts about 0.5 seconds; a shrinking ring shows how much time
+- By default a stroke lasts 0.5 seconds; a shrinking ring shows how much time
   is left. Going fast covers more ground but is riskier.
 - Touch a wall and you crash: the stroke is cut at the point of impact and
   the turn passes to the other player. Your next stroke starts from the
@@ -32,7 +50,7 @@ shared circuit geometry in `track/brno-circuit.js`. No frameworks or build step.
   zone sits just before the shared start/finish line. Crossing it at the
   beginning does not win; you must complete a full lap first.
 - First player to finish the lap wins. Going backwards across a lap gate
-  clears lap progress. Tap **Rematch** to play again.
+  clears lap progress. Tap **Odveta** to play again.
 
 ## Running locally
 
@@ -58,6 +76,8 @@ collisions, touch tolerance and recovery after a crash, shortcuts, closed-wall
 geometry, and complete laps in portrait and landscape layouts. They also verify that the playable
 walls exactly match the approved preview and that each lap gate has only one
 crossing of the circuit. No dependencies are required.
+They also verify menu input isolation, race continuation, configurable turn
+deadlines, new-race behavior and validation of saved settings.
 
 ## Brno circuit
 
