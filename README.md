@@ -15,7 +15,7 @@ shared circuit geometry in `track/brno-circuit.js`. No frameworks or build step.
   finger (or mouse) to move your car.
 - Touch inside the circle around your car to start a stroke — the very
   first stroke of the game may start anywhere in the green start zone.
-- The stroke lasts about 0.6 seconds; a shrinking ring shows how much time
+- The stroke lasts about 0.5 seconds; a shrinking ring shows how much time
   is left. Going fast covers more ground but is riskier.
 - Touch a wall and you crash: the stroke is cut at the point of impact and
   the turn passes to the other player. Your next stroke starts from the

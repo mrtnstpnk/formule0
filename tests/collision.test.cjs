@@ -180,7 +180,7 @@ for (const [width, height] of [[390, 788], [1024, 712]]) {
         const { wall, at } = wallStart(api, side);
         begin(api, at(-3));
         move(api, at(-10));
-        if (reason === "timeout") api.elapse(601);
+        if (reason === "timeout") api.elapse(501);
         else api.onPointerUp({ ...pointer(at(-10)), type: reason === "cancel" ? "pointercancel" : "pointerup" });
         assert.equal(api.game.state, api.STATE.WAITING_FOR_TOUCH);
         assert.equal(api.game.currentPlayer, 1);
