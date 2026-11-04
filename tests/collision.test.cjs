@@ -132,13 +132,13 @@ test("opening the menu commits an active stroke and resuming preserves the race"
   assert.equal(api.game.currentPlayer, 1);
 });
 
-for (const duration of [300, 500, 800, 1000]) {
+for (const duration of [300, 500, 800]) {
   test(`selected ${duration} ms duration ends the turn at its deadline and is fixed for that stroke`, () => {
     const api = loadGame(390, 788);
     api.settings.strokeDurationMs = duration;
     begin(api, api.track.startPoint);
     assert.equal(api.game.strokeDurationMs, duration);
-    api.settings.strokeDurationMs = 1000;
+    api.settings.strokeDurationMs = duration === 800 ? 300 : 800;
     api.elapse(duration - 1);
     assert.equal(api.game.state, api.STATE.DRAWING);
     api.elapse(1);
@@ -168,7 +168,7 @@ test("a new race clears progress and uses the chosen hint preference", () => {
 });
 
 test("malformed or unsupported saved settings fall back to valid defaults", () => {
-  for (const savedSettings of ["{bad json", "null", '{"strokeDurationMs":1,"showHint":"false","vibration":0}']) {
+  for (const savedSettings of ["{bad json", "null", '{"strokeDurationMs":1000}', '{"strokeDurationMs":1,"showHint":"false","vibration":0}']) {
     const api = loadGame(390, 788, { start: false, savedSettings });
     assert.equal(api.settings.strokeDurationMs, 500);
     assert.equal(api.settings.showHint, true);

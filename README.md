@@ -15,8 +15,9 @@ The Czech-language home screen opens before the race. Choose **Nový závod**
 to start, **Nastavení** to adjust the game, or **O hře** for rules and game
 information. The home screen previews the same Brno circuit used in the race.
 
-Settings include turn duration (300, 500, 800 or 1000 ms), crash vibration,
-the visual countdown and the pre-race hint. The default remains 500 ms.
+Settings include difficulty (**Lehká**: 800 ms, **Střední**: 500 ms,
+**Těžká**: 300 ms per turn), crash vibration, the visual countdown and the
+pre-race hint. The default is **Střední**, with 500 ms per turn.
 Changes save automatically in this browser, with an **Obnovit výchozí**
 button to restore defaults. If browser storage is unavailable, settings
 still work for the current session.

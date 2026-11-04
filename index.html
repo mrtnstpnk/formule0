@@ -128,8 +128,8 @@
       <header class="page-heading"><p class="eyebrow">Po tvém</p><h1 id="settingsTitle" tabindex="-1">Nastavení</h1><p>Vylaď si závod před dalším startem.</p></header>
       <div class="settings-card">
         <div class="setting-row">
-          <label class="setting-copy" for="durationSetting"><strong>Délka tahu</strong><small>Kratší čas znamená svižnější souboj.</small></label>
-          <select id="durationSetting"><option value="300">300 ms</option><option value="500" selected>500 ms</option><option value="800">800 ms</option><option value="1000">1 000 ms</option></select>
+          <label class="setting-copy" for="difficultySetting"><strong>Obtížnost</strong><small>Vyšší obtížnost zkracuje čas na tah.</small></label>
+          <select id="difficultySetting"><option value="800">Lehká</option><option value="500" selected>Střední</option><option value="300">Těžká</option></select>
         </div>
         <div class="setting-row">
           <label class="setting-copy" for="vibrationSetting"><strong>Vibrace při nárazu</strong><small>Na zařízeních, která vibrace podporují.</small></label>
@@ -210,7 +210,7 @@
   const PLAYER_COLORS = ["#2563eb", "#dc2626"];   // player 1 blue, player 2 red
   const PLAYER_NAMES = ["Hráč 1", "Hráč 2"];
   const SETTINGS_KEY = "formule0.settings.v1";
-  const TURN_DURATIONS = [300, 500, 800, 1000];
+  const TURN_DURATIONS = [300, 500, 800];
   const DEFAULT_SETTINGS = { strokeDurationMs: STROKE_DURATION_MS, vibration: true, showTimer: true, showHint: true };
 
   function loadSettings() {
@@ -309,7 +309,7 @@
   }
 
   function updateSettingsUI() {
-    document.getElementById("durationSetting").value = String(settings.strokeDurationMs);
+    document.getElementById("difficultySetting").value = String(settings.strokeDurationMs);
     for (const [id, key] of [["vibrationSetting", "vibration"], ["timerSetting", "showTimer"], ["hintSetting", "showHint"]]) {
       document.getElementById(id).checked = settings[key];
     }
@@ -336,7 +336,7 @@
   for (const id of ["settingsBackBtn", "aboutBackBtn", "menuBtn", "victoryMenuBtn"]) {
     document.getElementById(id).addEventListener("click", () => showScreen("home"));
   }
-  document.getElementById("durationSetting").addEventListener("change", function () {
+  document.getElementById("difficultySetting").addEventListener("change", function () {
     const value = Number(this.value);
     if (TURN_DURATIONS.includes(value)) settings.strokeDurationMs = value;
     saveSettings();
