@@ -8,14 +8,17 @@ const vm = require("node:vm");
 const html = fs.readFileSync(path.join(__dirname, "..", "index.html"), "utf8");
 const source = html.match(/<script>([\s\S]*?)<\/script>/)[1].replace(/\}\)\(\);\s*$/, `
   globalThis.testGame = {
-    game, track, STATE, onPointerDown, onPointerMove, onPointerUp,
+    game, get track() { return track; }, STATE, onPointerDown, onPointerMove, onPointerUp,
     findNearestIntersection, pointInPolygon, pointInRoad, segIntersect, resetGame, dist, loop,
-    app, settings, startRace, showScreen
+    app, settings, startRace, showScreen, resize, scheduleResize,
+    get layoutPending() { return layoutPending; }
   };
 })();`);
 
 function loadGame(width, height, { start = true, savedSettings = null } = {}) {
   let now = 0;
+  let timerId = 0;
+  const timers = new Map();
   const context = new Proxy({}, { get: () => () => {} });
   const makeElement = () => ({
     getContext: () => context,
@@ -35,12 +38,23 @@ function loadGame(width, height, { start = true, savedSettings = null } = {}) {
     },
     window: { devicePixelRatio: 1, addEventListener() {} },
     navigator: {}, performance: { now: () => now }, requestAnimationFrame() {},
+    setTimeout(callback) { timers.set(++timerId, callback); return timerId; },
+    clearTimeout(id) { timers.delete(id); },
   };
   if (savedSettings !== null) sandbox.localStorage = { getItem: () => savedSettings };
   vm.runInNewContext(source, sandbox);
   const api = sandbox.testGame;
   api.element = id => elements.get(id);
   api.elapse = ms => { now += ms; api.loop(); };
+  api.setViewport = (nextWidth, nextHeight, nextDpr = sandbox.window.devicePixelRatio) => {
+    width = nextWidth; height = nextHeight; sandbox.window.devicePixelRatio = nextDpr;
+  };
+  api.resizeTo = (...args) => { api.setViewport(...args); api.resize(); };
+  api.flushResize = () => {
+    const pending = [...timers.values()];
+    timers.clear();
+    pending.forEach(callback => callback());
+  };
   if (start) {
     api.startRace();
     api.game.hintDismissed = true;
@@ -172,6 +186,147 @@ test("a finished race offers a new start instead of continuing the finished race
   api.game.state = api.STATE.GAME_OVER;
   api.showScreen("home");
   assert.equal(api.element("resumeBtn").hidden, true);
+});
+
+test("tablet rotation preserves both cars, complete stroke history, crash markers and lap progress", () => {
+  const api = loadGame(820, 1124);
+  const len = api.track.centerline.length;
+  const index = api.track.checkpoints[0].index + 4;
+  begin(api, api.track.startPoint);
+  for (let i = len - 7; i <= len + index; i++) move(api, api.track.centerline[i % len]);
+  end(api, api.track.centerline[index]);
+  assert.equal(api.game.nextCheckpoint[0], 1);
+  begin(api, api.track.startPoint);
+  move(api, interpolate(api.track.startPoint, api.track.left[len - 8], 1.1));
+  assert.equal(api.game.strokes[1].crashed, true);
+  const original = api.game.strokes.map(s => s.points.map(p => ({ x: p.x, y: p.y })));
+  const checkpoint = [...api.game.nextCheckpoint];
+  api.resizeTo(1180, 764);
+  assert.equal(api.game.currentPlayer, 0);
+  assert.equal(api.game.state, api.STATE.WAITING_FOR_TOUCH);
+  assert.deepEqual([...api.game.nextCheckpoint], checkpoint);
+  assert.equal(api.game.strokes.length, 2);
+  assert.equal(api.game.strokes[1].crashed, true);
+  assert(api.dist(api.game.positions[0], api.track.centerline[index]) < 1e-7);
+  assert(api.dist(api.game.positions[1], api.track.left[len - 8]) < 1e-7);
+  assert(api.dist(api.game.crashMarkers[0], api.game.positions[1]) < 1e-7);
+  assert.equal(api.game.positions[0], api.game.strokes[0].points.at(-1));
+  assert.equal(api.game.positions[1], api.game.strokes[1].points.at(-1));
+  for (let rotation = 0; rotation < 10; rotation++) {
+    api.resizeTo(820, 1124);
+    for (let s = 0; s < original.length; s++) {
+      for (let p = 0; p < original[s].length; p++) assert(api.dist(api.game.strokes[s].points[p], original[s][p]) < 1e-7);
+    }
+    api.resizeTo(1180, 764);
+  }
+});
+
+for (const side of ["left", "right"]) {
+  test(`tablet rotation preserves recovery from the ${side} wall`, () => {
+    const api = loadGame(820, 1124);
+    crashFromStart(api, side);
+    api.resizeTo(1180, 764);
+    const position = api.game.positions[0];
+    begin(api, position);
+    assert(api.game.currentStroke.startCircle);
+    const destination = interpolate(position, api.track.startPoint, 1.2);
+    move(api, destination);
+    assert.equal(api.game.state, api.STATE.DRAWING);
+    assert.equal(api.game.currentStroke.startCircle, null);
+    end(api, destination);
+    assert.equal(api.game.strokes.at(-1).crashed, false);
+    assert(api.dist(api.game.positions[0], destination) < 1e-7);
+  });
+}
+
+test("an in-progress stroke ends once at its valid endpoint when the tablet rotates", () => {
+  const api = loadGame(820, 1124);
+  begin(api, api.track.startPoint);
+  move(api, api.track.centerline.at(-7));
+  api.resizeTo(1180, 764);
+  assert.equal(api.game.state, api.STATE.WAITING_FOR_TOUCH);
+  assert.equal(api.game.currentStroke, null);
+  assert.equal(api.game.activePointerId, null);
+  assert.equal(api.game.strokes.length, 1);
+  assert.equal(api.game.currentPlayer, 1);
+  assert(api.dist(api.game.positions[0], api.track.centerline.at(-7)) < 1e-7);
+  end(api, api.track.startPoint);
+  api.elapse(2000);
+  assert.equal(api.game.strokes.length, 1);
+  assert.equal(api.game.currentPlayer, 1);
+});
+
+test("duplicate and zero-size resize events do not consume a turn or erase progress", () => {
+  const api = loadGame(820, 1124);
+  begin(api, api.track.startPoint);
+  move(api, api.track.centerline.at(-7));
+  const track = api.track;
+  const stroke = api.game.currentStroke;
+  api.resizeTo(820, 1124);
+  api.scheduleResize();
+  assert.equal(api.game.currentStroke, stroke);
+  assert.equal(api.layoutPending, false);
+  api.resizeTo(0, 0);
+  assert.equal(api.game.currentStroke, stroke);
+  assert.equal(api.track, track);
+  api.resizeTo(1180, 764);
+  assert.equal(api.game.strokes.length, 1);
+});
+
+test("new touches are ignored until a debounced orientation change has finished", () => {
+  const api = loadGame(820, 1124);
+  begin(api, api.track.startPoint);
+  move(api, api.track.centerline.at(-7));
+  api.setViewport(1180, 764);
+  api.scheduleResize();
+  api.scheduleResize();
+  assert.equal(api.layoutPending, true);
+  assert.equal(api.game.strokes.length, 1);
+  begin(api, api.track.startPoint);
+  assert.equal(api.game.currentStroke, null);
+  api.flushResize();
+  assert.equal(api.layoutPending, false);
+  assert.equal(api.track.width, 1180);
+  begin(api, api.track.startPoint);
+  assert.equal(api.game.state, api.STATE.DRAWING);
+  assert.equal(api.game.currentPlayer, 1);
+});
+
+test("same-orientation resizing and pixel density changes preserve the race behind menus", () => {
+  const api = loadGame(1024, 712);
+  begin(api, api.track.startPoint);
+  end(api, api.track.startPoint);
+  api.settings.strokeDurationMs = 800;
+  api.showScreen("settings");
+  api.resizeTo(1400, 900, 2);
+  assert.equal(api.app.screen, "settings");
+  assert.equal(api.app.raceStarted, true);
+  assert.equal(api.game.strokes.length, 1);
+  assert.equal(api.game.currentPlayer, 1);
+  assert.equal(api.game.hintDismissed, true);
+  assert.equal(api.settings.strokeDurationMs, 800);
+  assert(api.dist(api.game.positions[0], api.track.startPoint) < 1e-7);
+});
+
+test("lap progress survives rotation, the lap can finish, and a later resize preserves the win", () => {
+  const api = loadGame(820, 1124);
+  const len = api.track.centerline.length;
+  const index = api.track.checkpoints[0].index + 4;
+  begin(api, api.track.startPoint);
+  for (let i = len - 7; i <= len + index; i++) move(api, api.track.centerline[i % len]);
+  end(api, api.track.centerline[index]);
+  passOpponent(api);
+  api.resizeTo(1180, 764);
+  begin(api, api.game.positions[0]);
+  for (let i = index + 1; i <= len; i++) move(api, api.track.centerline[i % len]);
+  assert.equal(api.game.state, api.STATE.GAME_OVER);
+  assert.equal(api.game.winner, 0);
+  const strokes = api.game.strokes.length;
+  api.resizeTo(820, 1124);
+  assert.equal(api.game.state, api.STATE.GAME_OVER);
+  assert.equal(api.game.winner, 0);
+  assert.equal(api.game.strokes.length, strokes);
+  assert(api.dist(api.game.positions[0], api.track.centerline[0]) < 1e-7);
 });
 
 for (const [width, height] of [[390, 788], [1024, 712]]) {

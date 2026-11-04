@@ -356,6 +356,7 @@
 
   let dpr = Math.max(1, window.devicePixelRatio || 1);
   let W = 0, H = 0; // canvas CSS-pixel dimensions
+  let layoutPending = false;
 
   // =========================================================================
   // GEOMETRY HELPERS
@@ -480,6 +481,11 @@
       return { x: width / 2 + (p.x - (minX + maxX) / 2) * scale,
         y: height / 2 + (p.y - (minY + maxY) / 2) * scale };
     }
+    function toPlan(point) {
+      const p = { x: (point.x - width / 2) / scale + (minX + maxX) / 2,
+        y: (point.y - height / 2) / scale + (minY + maxY) / 2 };
+      return portrait ? { x: p.y, y: -p.x } : p;
+    }
 
     // Put the shared start/finish at index zero, as expected by the lap logic.
     const finishSection = 12;
@@ -520,7 +526,7 @@
     const arrowIndices = [2, 10, 13, 21, 27, 33, 35, 39, 44, 48, 52, 55, 59, 63, 66]
       .map(anchor => indexOf(anchor * 12 + 4));
     return {
-      width, height, minDim, scale,
+      width, height, minDim, scale, toPlan, fromPlan: transform,
       centerline, left, right, wallSegments, finishSegment, checkpoints, lapGates,
       boundsSegments, startZonePolygon, finishBandPolygon, turnIndices, arrowIndices,
       collisionSegments: wallSegments.concat(boundsSegments),
@@ -730,7 +736,7 @@
   }
 
   function onPointerDown(e) {
-    if (app.screen !== "race") return;
+    if (app.screen !== "race" || layoutPending || !track) return;
     if (!game.hintDismissed) return; // hint overlay eats the very first touch
     if (game.state === STATE.GAME_OVER) return;
     if (game.state === STATE.DRAWING) return; // ignore extra fingers
@@ -866,6 +872,7 @@
     try { canvas.releasePointerCapture(game.activePointerId); } catch (err) { /* pointer may already be released */ }
     game.activePointerId = null;
     const lastPoint = stroke.points[stroke.points.length - 1];
+    stroke.startCircle = null; // recovery tolerance belongs only to an active stroke
     stroke.crashed = (reason === "crash");
     game.strokes.push(stroke);
     game.positions[stroke.player] = lastPoint;
@@ -943,32 +950,67 @@
   // =========================================================================
 
   function resize() {
-    dpr = Math.max(1, window.devicePixelRatio || 1);
     const rect = canvasWrap.getBoundingClientRect();
+    // Some browsers briefly report a zero-sized viewport during rotation.
+    // Keep the last valid geometry until the next usable resize event.
+    if (rect.width <= 0 || rect.height <= 0) return;
+    const nextDpr = Math.max(1, window.devicePixelRatio || 1);
+    if (track && rect.width === W && rect.height === H && nextDpr === dpr) {
+      layoutPending = false;
+      return;
+    }
+    if (game.currentStroke) endStroke("normal");
+
+    const previousTrack = track;
+    dpr = nextDpr;
     W = rect.width; H = rect.height;
     canvas.width = Math.round(W * dpr);
     canvas.height = Math.round(H * dpr);
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
 
     track = generateTrack(W, H);
+    if (previousTrack) {
+      // Pass through the unscaled circuit plan so rotation, scaling and
+      // translation preserve the exact place on the road. Reuse projected
+      // objects where a car position is also the endpoint of its last stroke.
+      const projected = new Map();
+      const project = point => {
+        if (point === null) return null;
+        if (!projected.has(point)) projected.set(point, track.fromPlan(previousTrack.toPlan(point)));
+        return projected.get(point);
+      };
+      game.positions = game.positions.map(project);
+      for (const stroke of game.strokes) stroke.points = stroke.points.map(project);
+      game.crashMarkers = game.crashMarkers.map(project);
+    }
+    layoutPending = false;
     buildStaticLayer();
-    resetGame(); // geometry changed (e.g. rotation) -- restart for a consistent state
+    if (!previousTrack) resetGame();
+    else render();
   }
 
   let resizeTimer = null;
-  window.addEventListener("resize", function () {
+  function scheduleResize() {
+    const rect = canvasWrap.getBoundingClientRect();
+    if (!layoutPending && rect.width === W && rect.height === H &&
+        Math.max(1, window.devicePixelRatio || 1) === dpr) return;
+    if (game.currentStroke) endStroke("normal");
+    // Ignore new strokes while CSS dimensions and the circuit geometry
+    // differ during the resize debounce interval.
+    layoutPending = true;
     clearTimeout(resizeTimer);
     resizeTimer = setTimeout(resize, 150);
-  });
+  }
+  window.addEventListener("resize", scheduleResize);
 
   function loop() {
-    if (app.screen === "race" && game.state === STATE.DRAWING) {
+    if (app.screen === "race" && !layoutPending && game.state === STATE.DRAWING) {
       const elapsed = performance.now() - game.strokeStartTime;
       if (elapsed >= game.strokeDurationMs) {
         endStroke("normal"); // time's up -- stroke ends where the finger currently is
       }
     }
-    if (app.screen === "race") render();
+    if (app.screen === "race" && !layoutPending) render();
     requestAnimationFrame(loop);
   }
 

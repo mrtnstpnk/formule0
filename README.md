@@ -25,7 +25,9 @@ During a race, **Menu** returns home and **Pokračovat v závodě** resumes it.
 Opening the menu during a stroke commits that stroke at its last accepted
 point and ends the turn; the timer does not run behind the menu. **Nový závod**
 and **Restart** clear the race. Escape returns to the menu or resumes a race
-from home. Rotating or resizing the game resets the circuit as before.
+from home. Rotating or resizing preserves car positions, stroke history,
+crash markers and lap progress. An active stroke ends at its last accepted
+point before the geometry changes; the race then continues in the new layout.
 
 ## How to play
 
