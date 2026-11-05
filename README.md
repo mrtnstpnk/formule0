@@ -55,13 +55,19 @@ point before the geometry changes; the race then continues in the new layout.
 - Follow the arrows clockwise around the entire circuit. The green start
   zone sits just before the shared start/finish line. Crossing it at the
   beginning does not win; you must complete a full lap first.
-- The first completed lap starts the final round. Players who have taken
-  fewer turns get their remaining turn; players with the same number of turns
-  do not get another. The race is decided after these turns finish.
+- Every completed lap opens an equal-turn phase for players still racing.
+  Players with fewer turns get a chance to match the finisher's turn count.
+  Once that phase is settled, finished players stop taking turns and the
+  remaining players race on for the lower places.
 - Crossing the finish does not end the stroke. Among finishers with the same
   turn count, the furthest final position along the road beyond the finish wins.
   Sideways movement adds no distance, reversing reduces it, and collisions
-  still stop the stroke. Equal distances result in a draw.
+  still stop the stroke. Fewer turns always rank ahead of a longer finish distance
+  on more turns. Equal turn counts and distances share a place (1, 1, 3).
+- The race ends once everyone has finished, or only one unfinished player
+  remains after the equal-turn chance. That player receives the last place
+  without needing to finish. The result lists all players, their places and
+  turn counts, and marks an unfinished last player as **Nedojel**.
 - Going backwards across a lap gate before finishing clears lap progress.
   Tap **Odveta** to play again.
 - The result appears beside the track in landscape or below it in portrait.

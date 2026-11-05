@@ -105,6 +105,14 @@ button:focus-visible, a:focus-visible, select:focus-visible, input:focus-visible
 #victory .medal { font-size: 32px; flex: none; }
 #victory h1 { margin: 0; font-size: 22px; line-height: 1.25; }
 .victory-summary { color: #475569; margin: 4px 0 0; font-size: 12px; line-height: 1.6; }
+.result-details { min-width: 0; }
+.race-standings { list-style: none; padding: 0; margin: 10px 0 0; }
+.standing-row { display: grid; grid-template-columns: 22px 8px minmax(0, 1fr); align-items: center; gap: 8px; padding: 7px 0; border-top: 1px solid #e2e8f0; }
+.standing-place { font-size: 14px; font-weight: 750; color: #334155; }
+.standing-dot { width: 8px; height: 8px; border-radius: 50%; }
+.standing-copy { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 3px 8px; font-size: 13px; }
+.standing-copy strong { font-weight: 600; }
+.standing-detail { font-size: 11px; color: #64748b; }
 .result-actions { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
 #rematchBtn, .victory-menu { min-height: 44px; border-radius: 10px; padding: 10px 14px; font-size: 14px; font-weight: 600; }
 #rematchBtn { background: #2563eb; color: #fff; border: 1px solid #2563eb; }
@@ -166,5 +174,14 @@ button:focus-visible, a:focus-visible, select:focus-visible, input:focus-visible
   .results-visible #victory { align-content: start; padding: 12px; }
   .results-visible #victory .medal { display: none; }
   .results-visible #victory h1 { font-size: 20px; }
+}
+@media (orientation: portrait) and (max-width: 640px) {
+  #victory { gap: 8px; padding-block: 10px; }
+  .race-standings { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); column-gap: 12px; margin-top: 8px; }
+  .standing-row { grid-template-columns: 18px 6px minmax(0, 1fr); gap: 6px; padding-block: 6px; }
+  .standing-place { font-size: 13px; }
+  .standing-dot { width: 6px; height: 6px; }
+  .standing-copy { font-size: 12px; gap: 3px 6px; }
+  .victory-summary { font-size: 11px; margin-top: 3px; line-height: 1.5; }
 }
 @media (prefers-reduced-motion: reduce) { *, *::before, *::after { transition: none !important; } }
