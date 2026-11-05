@@ -30,7 +30,7 @@ Opening the menu during a stroke commits that stroke at its last accepted
 point and ends the turn; the timer does not run behind the menu. **Nový závod**
 and **Restart** clear the race. Escape returns to the menu or resumes a race
 from home. Rotating or resizing preserves car positions, stroke history,
-crash markers and lap progress. An active stroke ends at its last accepted
+end-of-turn crosses and lap progress. An active stroke ends at its last accepted
 point before the geometry changes; the race then continues in the new layout.
 
 ## How to play
@@ -52,6 +52,9 @@ point before the geometry changes; the race then continues in the new layout.
   exit, including within the same fast movement. Releasing or running out
   of time inside the circle leaves the car in place.
 - Stay inside the track and the turn simply passes after your stroke ends.
+- Every stroke ends with a cross in that player's color, whether it stops
+  inside the road or at a collision. Each diagonal is 60% of the original
+  crash marker's length; crosses remain in place as part of the stroke history.
 - Follow the arrows clockwise around the entire circuit. The green start
   zone sits just before the shared start/finish line. Crossing it at the
   beginning does not win; you must complete a full lap first.
@@ -136,7 +139,7 @@ To enable it on GitHub:
   Rendering and collisions use its exact closed wall polygons, with a green
   grid and shared start/finish stripe. The infield stays outside the road.
 - **Rendering** — a pre-rendered static track layer plus per-frame
-  strokes, crash markers, and the stroke time indicator.
+  strokes, end-of-turn crosses, and the stroke time indicator.
 - **Input handling** — Pointer Events unify touch and mouse.
 - **Game logic** — turn handling, crash detection, three ordered directional
   checkpoints per player, full-lap finish detection, and reset/rematch.

@@ -690,7 +690,7 @@ test("rotation preserves the positions and lap progress of all four players", ()
   }
 });
 
-test("tablet rotation preserves both cars, complete stroke history, crash markers and lap progress", () => {
+test("tablet rotation preserves both cars, complete stroke history, endpoints and lap progress", () => {
   const api = loadGame(820, 1124);
   const len = api.track.centerline.length;
   const index = api.track.checkpoints[0].index + 4;
@@ -711,7 +711,6 @@ test("tablet rotation preserves both cars, complete stroke history, crash marker
   assert.equal(api.game.strokes[1].crashed, true);
   assert(api.dist(api.game.positions[0], api.track.centerline[index]) < 1e-7);
   assert(api.dist(api.game.positions[1], api.track.left[len - 8]) < 1e-7);
-  assert(api.dist(api.game.crashMarkers[0], api.game.positions[1]) < 1e-7);
   assert.equal(api.game.positions[0], api.game.strokes[0].points.at(-1));
   assert.equal(api.game.positions[1], api.game.strokes[1].points.at(-1));
   for (let rotation = 0; rotation < 10; rotation++) {
