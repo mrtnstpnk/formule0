@@ -32,6 +32,11 @@ and **Restart** clear the race. Escape returns to the menu or resumes a race
 from home. Rotating or resizing preserves car positions, stroke history,
 end-of-turn crosses and lap progress. An active stroke ends at its last accepted
 point before the geometry changes; the race then continues in the new layout.
+If the browser loses a canvas drawing context, the active turn ends once at its
+last accepted point. New turns wait until drawing is restored; car positions,
+stroke history and lap progress remain in memory. Both the track artwork and
+the canvas scale are rebuilt on restoration. The cached track canvas is reused
+across layout changes, and a failed animation frame does not stop the turn timer.
 
 ## How to play
 
@@ -55,6 +60,16 @@ point before the geometry changes; the race then continues in the new layout.
 - Every stroke ends with a cross in that player's color, whether it stops
   inside the road or at a collision. Each diagonal is 60% of the original
   crash marker's length; crosses remain in place as part of the stroke history.
+- Strokes and endpoint crosses in the current turn round are fully opaque.
+  After the last racing player ends the round, that round fades to 60% opacity;
+  all older rounds use 50%. Current car positions stay fully visible.
+  Rounds continue to advance when finished players are skipped, and the final
+  round fades to 60% when the race ends.
+- Each player's most recent completed stroke uses 1% of the smaller play-area
+  dimension, bounded to 3–8 CSS pixels. That player's earlier lines use 60%
+  of that width (0.6% before those bounds), independently of round opacity.
+  A stroke being drawn is also thick; the previous stroke becomes thin only
+  when the new stroke ends. Finished players keep their final stroke thick.
 - Follow the arrows clockwise around the entire circuit. The green start
   zone sits just before the shared start/finish line. Crossing it at the
   beginning does not win; you must complete a full lap first.
@@ -102,7 +117,9 @@ geometry, and complete laps in portrait and landscape layouts. They also verify 
 walls exactly match the approved preview and that each lap gate has only one
 crossing of the circuit. No dependencies are required.
 They also verify menu input isolation, race continuation, configurable turn
-deadlines, new-race behavior and validation of saved settings.
+deadlines, new-race behavior and validation of saved settings. Rendering recovery
+checks cover a failed frame, an invalid track cache and loss/restoration of one
+or both canvas contexts without resetting lap progress or consuming extra turns.
 
 ## Brno circuit
 

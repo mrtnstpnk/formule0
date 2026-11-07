@@ -10,7 +10,8 @@ const source = html.match(/<script>([\s\S]*?)<\/script>/)[1].replace(/\}\)\(\);\
   globalThis.testGame = {
     game, get track() { return track; }, STATE, onPointerDown, onPointerMove, onPointerUp,
     findNearestIntersection, pointInPolygon, pointInRoad, segIntersect, resetGame, dist, loop,
-    app, settings, startRace, showScreen, resize, scheduleResize,
+    app, settings, startRace, showScreen, resize, scheduleResize, render,
+    get staticLayer() { return staticLayer; },
     get layoutPending() { return layoutPending; }
   };
 })();`);
@@ -19,16 +20,27 @@ function loadGame(width, height, { start = true, savedSettings = null } = {}) {
   let now = 0;
   let timerId = 0;
   const timers = new Map();
-  const context = new Proxy({}, { get: () => () => {} });
-  const makeElement = () => ({
-    getContext: () => context,
-    getBoundingClientRect: () => ({ left: 0, top: 0, width, height }),
-    addEventListener() {}, setPointerCapture() {}, focus() {}, setAttribute() {},
-    children: [],
-    append(...children) { this.children.push(...children); },
-    replaceChildren(...children) { this.children = children; },
-    style: {}, classList: { add() {}, remove() {}, toggle() {} },
-  });
+  const frames = [];
+  const makeElement = () => {
+    const context = new Proxy({}, { get: (target, key) => target[key] || (() => {}) });
+    const listeners = new Map();
+    return {
+      getContext: () => context,
+      getBoundingClientRect: () => ({ left: 0, top: 0, width, height }),
+      addEventListener(type, callback) {
+        if (!listeners.has(type)) listeners.set(type, []);
+        listeners.get(type).push(callback);
+      },
+      dispatchEvent(event) {
+        for (const callback of listeners.get(event.type) || []) callback({ ...event, target: this });
+      },
+      setPointerCapture() {}, focus() {}, setAttribute() {},
+      children: [],
+      append(...children) { this.children.push(...children); },
+      replaceChildren(...children) { this.children = children; },
+      style: {}, classList: { add() {}, remove() {}, toggle() {} },
+    };
+  };
   const elements = new Map();
   const sandbox = {
     BrnoCircuit: require("../track/brno-circuit.js"),
@@ -40,7 +52,7 @@ function loadGame(width, height, { start = true, savedSettings = null } = {}) {
       createElement: makeElement, addEventListener() {},
     },
     window: { devicePixelRatio: 1, addEventListener() {} },
-    navigator: {}, performance: { now: () => now }, requestAnimationFrame() {},
+    navigator: {}, performance: { now: () => now }, requestAnimationFrame(callback) { frames.push(callback); },
     setTimeout(callback) { timers.set(++timerId, callback); return timerId; },
     clearTimeout(id) { timers.delete(id); },
   };
@@ -49,6 +61,12 @@ function loadGame(width, height, { start = true, savedSettings = null } = {}) {
   const api = sandbox.testGame;
   api.element = id => elements.get(id);
   api.elapse = ms => { now += ms; api.loop(); };
+  api.nextFrame = (ms = 0) => {
+    now += ms;
+    const callback = frames.shift();
+    assert(callback, "the animation loop must have a scheduled frame");
+    callback(now);
+  };
   api.setViewport = (nextWidth, nextHeight, nextDpr = sandbox.window.devicePixelRatio) => {
     width = nextWidth; height = nextHeight; sandbox.window.devicePixelRatio = nextDpr;
   };
@@ -510,6 +528,108 @@ test("opening the menu commits an active stroke and resuming preserves the race"
   api.showScreen("race");
   assert.equal(api.game.positions[0], position);
   assert.equal(api.game.currentPlayer, 1);
+});
+
+
+test("a failed frame does not stop the animation or strand an active turn past its deadline", () => {
+  const api = loadGame(820, 1124);
+  begin(api, api.track.startPoint);
+  move(api, api.track.centerline.at(-7));
+  const context = api.element("track").getContext("2d");
+  let fail = true, draws = 0;
+  context.drawImage = () => {
+    if (fail) { fail = false; throw new Error("temporary drawing failure"); }
+    draws++;
+  };
+  assert.throws(() => api.nextFrame(100), /temporary drawing failure/);
+  assert.equal(api.game.state, api.STATE.DRAWING);
+  api.nextFrame(401);
+  assert.equal(draws, 1);
+  assert.equal(api.game.state, api.STATE.WAITING_FOR_TOUCH);
+  assert.equal(api.game.currentPlayer, 1);
+  assert.equal(api.game.strokes.length, 1);
+  assert(api.dist(api.game.positions[0], api.track.centerline.at(-7)) < 1e-7);
+});
+
+test("an invalid background is rebuilt before clearing the visible race", () => {
+  const api = loadGame(820, 1124);
+  begin(api, api.track.startPoint);
+  move(api, api.track.centerline.at(-7));
+  const context = api.element("track").getContext("2d");
+  const cache = api.staticLayer;
+  let clears = 0, draws = 0;
+  cache.width = 0;
+  context.clearRect = () => {
+    assert.equal(cache.width, api.element("track").width);
+    clears++;
+  };
+  context.drawImage = source => {
+    assert(source.width > 0 && source.height > 0);
+    draws++;
+  };
+  api.nextFrame(501);
+  assert.equal(clears, 1);
+  assert.equal(draws, 1);
+  assert.equal(api.staticLayer, cache);
+  assert.equal(api.game.strokes.length, 1);
+  assert.equal(api.game.currentPlayer, 1);
+  api.resizeTo(1180, 764, 2);
+  assert.equal(api.staticLayer, cache);
+  assert.equal(api.game.strokes.length, 1);
+});
+
+for (const target of ["visible canvas", "background canvas"]) {
+  test("loss and restoration of the " + target + " preserve lap progress and allow the next turn", () => {
+    const api = loadGame(820, 1124);
+    api.resizeTo(820, 1124, 2);
+    const canvas = api.element("track");
+    const context = canvas.getContext("2d");
+    const affected = target === "visible canvas" ? canvas : api.staticLayer;
+    const index = api.track.checkpoints[0].index + 3;
+    const len = api.track.centerline.length;
+    begin(api, api.track.startPoint);
+    for (let i = len - 7; i <= len + index; i++) move(api, api.track.centerline[i % len]);
+    assert.equal(api.game.nextCheckpoint[0], 1);
+    affected.dispatchEvent({ type: "contextlost" });
+    affected.dispatchEvent({ type: "contextlost" });
+    const progress = JSON.stringify(api.game);
+    let draws = 0;
+    context.drawImage = () => draws++;
+    begin(api, api.track.startPoint);
+    api.nextFrame(1000);
+    assert.equal(JSON.stringify(api.game), progress);
+    assert.equal(draws, 0);
+    assert.equal(api.game.strokes.length, 1);
+    assert.equal(api.game.currentPlayer, 1);
+    assert.equal(api.game.currentStroke, null);
+    let transform;
+    context.setTransform = (...args) => { transform = args; };
+    affected.dispatchEvent({ type: "contextrestored" });
+    assert.equal(JSON.stringify(api.game), progress);
+    assert.deepEqual(transform, [2, 0, 0, 2, 0, 0]);
+    assert.equal(draws, 1);
+    end(api, api.track.startPoint); // release of the interrupted finger is harmless
+    begin(api, api.track.startPoint);
+    api.nextFrame(501);
+    assert.equal(api.game.strokes.length, 2);
+    assert.equal(api.game.currentPlayer, 0);
+    assert.equal(api.game.nextCheckpoint[0], 1);
+    assert(api.dist(api.game.positions[0], api.track.centerline[index]) < 1e-7);
+  });
+}
+
+test("drawing waits for both lost canvases to be restored", () => {
+  const api = loadGame(820, 1124);
+  const canvas = api.element("track");
+  const cache = api.staticLayer;
+  canvas.dispatchEvent({ type: "contextlost" });
+  cache.dispatchEvent({ type: "contextlost" });
+  canvas.dispatchEvent({ type: "contextrestored" });
+  begin(api, api.track.startPoint);
+  assert.equal(api.game.currentStroke, null);
+  cache.dispatchEvent({ type: "contextrestored" });
+  begin(api, api.track.startPoint);
+  assert.equal(api.game.state, api.STATE.DRAWING);
 });
 
 for (const duration of [300, 500, 800]) {
