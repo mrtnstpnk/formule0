@@ -256,6 +256,7 @@
   // =========================================================================
   const canvas = document.getElementById("track");
   const ctx = canvas.getContext("2d");
+  const lostCanvases = new Set();
   const canvasWrap = document.getElementById("canvasWrap");
   const turnDot = document.getElementById("turnDot");
   const turnLabel = document.getElementById("turnLabel");
@@ -574,7 +575,13 @@
   // =========================================================================
 
   function buildStaticLayer() {
-    staticLayer = document.createElement("canvas");
+    // Reuse the backing canvas instead of allocating another tablet-sized
+    // bitmap after every rotation or change to the results layout.
+    if (!staticLayer) {
+      staticLayer = document.createElement("canvas");
+      staticLayer.addEventListener("contextlost", onContextLost);
+      staticLayer.addEventListener("contextrestored", onContextRestored);
+    }
     staticLayer.width = canvas.width;
     staticLayer.height = canvas.height;
     const sctx = staticLayer.getContext("2d");
@@ -679,6 +686,11 @@
   }
 
   function render() {
+    if (!track || renderingUnavailable()) return;
+    // Rebuild an invalid cache before clearing the last visible frame.
+    if (!staticLayer || staticLayer.width !== canvas.width || staticLayer.height !== canvas.height) {
+      buildStaticLayer();
+    }
     ctx.clearRect(0, 0, W, H);
     if (staticLayer) ctx.drawImage(staticLayer, 0, 0, W, H);
 
@@ -790,7 +802,7 @@
   }
 
   function onPointerDown(e) {
-    if (app.screen !== "race" || layoutPending || !track) return;
+    if (app.screen !== "race" || layoutPending || !track || renderingUnavailable()) return;
     if (!game.hintDismissed) return; // hint overlay eats the very first touch
     if (game.state === STATE.GAME_OVER) return;
     if (game.state === STATE.DRAWING) return; // ignore extra fingers
@@ -1083,6 +1095,30 @@
   // INIT / RESIZE / MAIN LOOP
   // =========================================================================
 
+  function renderingUnavailable() {
+    return lostCanvases.size > 0 || ctx.isContextLost?.() ||
+      (staticLayer && staticLayer.getContext("2d").isContextLost?.());
+  }
+
+  function onContextLost(event) {
+    // Keep the race in memory and commit an interrupted turn exactly once.
+    // The browser restores a 2D context by default; do not prevent that.
+    lostCanvases.add(event.target);
+    if (game.currentStroke) endStroke("normal");
+  }
+
+  function onContextRestored(event) {
+    lostCanvases.delete(event.target);
+    if (!track || renderingUnavailable()) return;
+    // A restored context has default drawing state, including its transform.
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    buildStaticLayer();
+    render();
+  }
+
+  canvas.addEventListener("contextlost", onContextLost);
+  canvas.addEventListener("contextrestored", onContextRestored);
+
   function resize() {
     const rect = canvasWrap.getBoundingClientRect();
     // Some browsers briefly report a zero-sized viewport during rotation.
@@ -1137,6 +1173,8 @@
   window.addEventListener("resize", scheduleResize);
 
   function loop() {
+    // Schedule first so a failed frame cannot also stop the turn timer.
+    requestAnimationFrame(loop);
     if (app.screen === "race" && !layoutPending && game.state === STATE.DRAWING) {
       const elapsed = performance.now() - game.strokeStartTime;
       if (elapsed >= game.strokeDurationMs) {
@@ -1144,7 +1182,6 @@
       }
     }
     if (app.screen === "race" && !layoutPending) render();
-    requestAnimationFrame(loop);
   }
 
   resize();

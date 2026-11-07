@@ -32,6 +32,11 @@ and **Restart** clear the race. Escape returns to the menu or resumes a race
 from home. Rotating or resizing preserves car positions, stroke history,
 end-of-turn crosses and lap progress. An active stroke ends at its last accepted
 point before the geometry changes; the race then continues in the new layout.
+If the browser loses a canvas drawing context, the active turn ends once at its
+last accepted point. New turns wait until drawing is restored; car positions,
+stroke history and lap progress remain in memory. Both the track artwork and
+the canvas scale are rebuilt on restoration. The cached track canvas is reused
+across layout changes, and a failed animation frame does not stop the turn timer.
 
 ## How to play
 
@@ -112,7 +117,9 @@ geometry, and complete laps in portrait and landscape layouts. They also verify 
 walls exactly match the approved preview and that each lap gate has only one
 crossing of the circuit. No dependencies are required.
 They also verify menu input isolation, race continuation, configurable turn
-deadlines, new-race behavior and validation of saved settings.
+deadlines, new-race behavior and validation of saved settings. Rendering recovery
+checks cover a failed frame, an invalid track cache and loss/restoration of one
+or both canvas contexts without resetting lap progress or consuming extra turns.
 
 ## Brno circuit
 
