@@ -702,7 +702,7 @@
       ctx.restore();
     }
 
-    const strokeWidth = clamp(track ? track.minDim * 0.013 : 5, 3, 8);
+    const strokeWidth = clamp(track ? track.minDim * 0.01 : 5, 3, 8);
     // Finished players stop taking turns, so use the active player's next
     // turn to identify the shared round. The last round is complete at game over.
     const round = (game.state === STATE.GAME_OVER ? Math.max(...game.turnsTaken) :
