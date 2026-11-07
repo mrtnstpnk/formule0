@@ -703,6 +703,7 @@
     }
 
     const strokeWidth = clamp(track ? track.minDim * 0.01 : 5, 3, 8);
+    const historyStrokeWidth = strokeWidth * 0.6;
     // Finished players stop taking turns, so use the active player's next
     // turn to identify the shared round. The last round is complete at game over.
     const round = (game.state === STATE.GAME_OVER ? Math.max(...game.turnsTaken) :
@@ -712,7 +713,7 @@
     ctx.save();
     for (const s of game.strokes) {
       ctx.globalAlpha = strokeOpacity(s, round);
-      drawStroke(ctx, s, PLAYER_COLORS[s.player], strokeWidth);
+      drawStroke(ctx, s, PLAYER_COLORS[s.player], s.round === round ? strokeWidth : historyStrokeWidth);
     }
     ctx.restore();
 

@@ -60,6 +60,9 @@ point before the geometry changes; the race then continues in the new layout.
   all older rounds use 50%. Current car positions stay fully visible.
   Rounds continue to advance when finished players are skipped, and the final
   round fades to 75% when the race ends.
+- Current-round stroke width is 1% of the smaller play-area dimension,
+  bounded to 3–8 CSS pixels. Completed-round lines use 60% of that width
+  (0.6% before those bounds), including the latest completed round.
 - Follow the arrows clockwise around the entire circuit. The green start
   zone sits just before the shared start/finish line. Crossing it at the
   beginning does not win; you must complete a full lap first.
