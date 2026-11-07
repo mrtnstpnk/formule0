@@ -56,13 +56,15 @@ point before the geometry changes; the race then continues in the new layout.
   inside the road or at a collision. Each diagonal is 60% of the original
   crash marker's length; crosses remain in place as part of the stroke history.
 - Strokes and endpoint crosses in the current turn round are fully opaque.
-  After the last racing player ends the round, that round fades to 75% opacity;
+  After the last racing player ends the round, that round fades to 60% opacity;
   all older rounds use 50%. Current car positions stay fully visible.
   Rounds continue to advance when finished players are skipped, and the final
-  round fades to 75% when the race ends.
-- Current-round stroke width is 1% of the smaller play-area dimension,
-  bounded to 3–8 CSS pixels. Completed-round lines use 60% of that width
-  (0.6% before those bounds), including the latest completed round.
+  round fades to 60% when the race ends.
+- Each player's most recent completed stroke uses 1% of the smaller play-area
+  dimension, bounded to 3–8 CSS pixels. That player's earlier lines use 60%
+  of that width (0.6% before those bounds), independently of round opacity.
+  A stroke being drawn is also thick; the previous stroke becomes thin only
+  when the new stroke ends. Finished players keep their final stroke thick.
 - Follow the arrows clockwise around the entire circuit. The green start
   zone sits just before the shared start/finish line. Crossing it at the
   beginning does not win; you must complete a full lap first.

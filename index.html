@@ -674,7 +674,7 @@
 
   function strokeOpacity(stroke, round) {
     if (stroke.round === round) return 1;
-    if (stroke.round === round - 1) return 0.75;
+    if (stroke.round === round - 1) return 0.6;
     return 0.5;
   }
 
@@ -708,12 +708,15 @@
     // turn to identify the shared round. The last round is complete at game over.
     const round = (game.state === STATE.GAME_OVER ? Math.max(...game.turnsTaken) :
       game.turnsTaken[game.currentPlayer]) + 1;
+    // Keep each player's last completed stroke thick until their next one ends.
+    const latestStrokes = Array(game.playerCount).fill(null);
+    for (const stroke of game.strokes) latestStrokes[stroke.player] = stroke;
 
     // committed strokes
     ctx.save();
     for (const s of game.strokes) {
       ctx.globalAlpha = strokeOpacity(s, round);
-      drawStroke(ctx, s, PLAYER_COLORS[s.player], s.round === round ? strokeWidth : historyStrokeWidth);
+      drawStroke(ctx, s, PLAYER_COLORS[s.player], s === latestStrokes[s.player] ? strokeWidth : historyStrokeWidth);
     }
     ctx.restore();
 
