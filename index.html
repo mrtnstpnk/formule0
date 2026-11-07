@@ -238,8 +238,8 @@
     finishes: Array(settings.playerCount).fill(null), // {turns, distance} in unscaled circuit units
     finalTurn: null,                  // equal-turn deadline for the current group of finishers
     standings: [],                    // complete classification, populated when the race ends
-    strokes: [],                      // committed strokes: {player, points:[{x,y}], crashed}
-    currentStroke: null,              // in-progress stroke: {player, points:[{x,y}]}
+    strokes: [],                      // committed strokes: {player, round, points:[{x,y}], crashed}
+    currentStroke: null,              // in-progress stroke: {player, round, points:[{x,y}]}
     strokeStartTime: 0,
     strokeDurationMs: settings.strokeDurationMs,
     activePointerId: null,
@@ -672,6 +672,12 @@
     c.stroke();
   }
 
+  function strokeOpacity(stroke, round) {
+    if (stroke.round === round) return 1;
+    if (stroke.round === round - 1) return 0.6;
+    return 0.3;
+  }
+
   function render() {
     ctx.clearRect(0, 0, W, H);
     if (staticLayer) ctx.drawImage(staticLayer, 0, 0, W, H);
@@ -697,11 +703,18 @@
     }
 
     const strokeWidth = clamp(track ? track.minDim * 0.013 : 5, 3, 8);
+    // Finished players stop taking turns, so use the active player's next
+    // turn to identify the shared round. The last round is complete at game over.
+    const round = (game.state === STATE.GAME_OVER ? Math.max(...game.turnsTaken) :
+      game.turnsTaken[game.currentPlayer]) + 1;
 
     // committed strokes
+    ctx.save();
     for (const s of game.strokes) {
+      ctx.globalAlpha = strokeOpacity(s, round);
       drawStroke(ctx, s, PLAYER_COLORS[s.player], strokeWidth);
     }
+    ctx.restore();
 
     // in-progress stroke
     if (game.currentStroke) {
@@ -724,9 +737,12 @@
     }
 
     // Keep the endpoint cross visible on top of the current position dot.
+    ctx.save();
     for (const stroke of game.strokes) {
+      ctx.globalAlpha = strokeOpacity(stroke, round);
       drawTurnMarker(stroke.points[stroke.points.length - 1], PLAYER_COLORS[stroke.player]);
     }
+    ctx.restore();
   }
 
   function drawTurnMarker(pos, color) {
@@ -789,7 +805,7 @@
 
     game.state = STATE.DRAWING;
     game.currentStroke = {
-      player: game.currentPlayer, points: [startPoint],
+      player: game.currentPlayer, round: game.turnsTaken[game.currentPlayer] + 1, points: [startPoint],
       startCircle: required !== null && pointOnWall(required, track) ?
         { center: startPoint, radius: startCircleRadius(), lastPointer: pos } : null,
     };

@@ -55,6 +55,11 @@ point before the geometry changes; the race then continues in the new layout.
 - Every stroke ends with a cross in that player's color, whether it stops
   inside the road or at a collision. Each diagonal is 60% of the original
   crash marker's length; crosses remain in place as part of the stroke history.
+- Strokes and endpoint crosses in the current turn round are fully opaque.
+  After the last racing player ends the round, that round fades to 60% opacity;
+  all older rounds use 30%. Current car positions stay fully visible.
+  Rounds continue to advance when finished players are skipped, and the final
+  round fades to 60% when the race ends.
 - Follow the arrows clockwise around the entire circuit. The green start
   zone sits just before the shared start/finish line. Crossing it at the
   beginning does not win; you must complete a full lap first.
