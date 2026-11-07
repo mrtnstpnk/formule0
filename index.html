@@ -1,9 +1,9 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="cs">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, minimum-scale=1, user-scalable=no, viewport-fit=cover">
-<title>Formule &mdash; Brno Circuit</title>
+<title>Formule0 — Závody jedním tahem</title>
 <style>
   * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
   html, body {
@@ -11,7 +11,7 @@
     overflow: hidden; overscroll-behavior: none;
     background: #0f172a;
     font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-    touch-action: none;
+    touch-action: auto;
     user-select: none; -webkit-user-select: none; -webkit-touch-callout: none;
   }
 
@@ -56,55 +56,139 @@
   #flash.active { opacity: 0.32; transition: opacity 0s; }
   #flash.fading { opacity: 0; transition: opacity 0.35s ease-out; }
 
-  #victory {
-    position: fixed; inset: 0; background: rgba(15, 23, 42, 0.94);
-    display: none; flex-direction: column; align-items: center; justify-content: center;
-    gap: 18px; z-index: 30; color: #fff; text-align: center; padding: 24px;
-  }
-  #victory.show { display: flex; }
-  #victory h1 { font-size: 30px; margin: 0; }
-  #victory .medal { font-size: 48px; }
-  #rematchBtn {
-    background: #2563eb; color: #fff; border: none; padding: 14px 32px;
-    border-radius: 12px; font-size: 17px; font-weight: 700;
-  }
-  #rematchBtn:active { background: #1d4ed8; }
 </style>
+<link rel="stylesheet" href="menu.css">
 </head>
 <body>
 
+  <svg xmlns="http://www.w3.org/2000/svg" hidden aria-hidden="true">
+    <symbol id="icon-play" viewBox="0 0 24 24"><path d="M7 4.5v15L20 12z"/></symbol>
+    <symbol id="icon-settings" viewBox="0 0 24 24"><path d="m9 3-.6 2.5-2 .9L4 5.7 2.5 8.3l1.8 1.8v2.3l-1.8 1.8L4 17l2.4-.7 2 .9L9 20h3l.6-2.8 2-.9 2.4.7 1.5-2.8-1.8-1.8v-2.3l1.8-1.8L17 5.7l-2.4.7-2-.9L12 3z"/><circle cx="10.5" cy="11.5" r="3"/></symbol>
+    <symbol id="icon-info" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 11v6M12 7v.1"/></symbol>
+    <symbol id="icon-back" viewBox="0 0 24 24"><path d="m10 5-7 7 7 7M3 12h18"/></symbol>
+  </svg>
+
+  <main id="homeScreen" class="screen" aria-labelledby="homeTitle">
+    <div class="screen-inner">
+      <header class="menu-header">
+        <div class="brand"><span class="brand-mark" aria-hidden="true">F0</span><span class="brand-caption">Závody jedním tahem</span></div>
+        <span class="players-pill"><span class="player-pair" aria-hidden="true"><i id="homePlayer1"></i><i id="homePlayer2"></i><i id="homePlayer3" hidden></i><i id="homePlayer4" hidden></i></span><span id="homePlayersLabel">2 hráči · 1 zařízení</span></span>
+      </header>
+      <div class="home-layout">
+        <section class="home-intro">
+          <p class="eyebrow">Papírová klasika. Nová startovní čára.</p>
+          <h1 id="homeTitle" class="home-title">FORMULE<span>0</span></h1>
+          <p class="home-lead">Rychlý tah. Přesná stopa.<br> Souboj o poslední zatáčku.</p>
+          <nav class="menu-actions" aria-label="Hlavní menu">
+            <button id="resumeBtn" class="menu-button button-primary" hidden><svg class="icon icon-play" aria-hidden="true"><use href="#icon-play"/></svg>Pokračovat v závodě</button>
+            <button id="playBtn" class="menu-button button-primary"><svg class="icon icon-play" aria-hidden="true"><use href="#icon-play"/></svg>Nový závod</button>
+            <div class="secondary-actions">
+              <button id="settingsBtn" class="menu-button"><svg class="icon" aria-hidden="true"><use href="#icon-settings"/></svg>Nastavení</button>
+              <button id="aboutBtn" class="menu-button"><svg class="icon" aria-hidden="true"><use href="#icon-info"/></svg>O hře</button>
+            </div>
+          </nav>
+          <p class="local-note">Vyraz na trať sám nebo vyzvi přátele.</p>
+        </section>
+        <section class="circuit-card" aria-label="Brněnský okruh">
+          <div class="circuit-card-header"><p class="eyebrow">Brněnský okruh</p><span class="track-tag">PŘIPRAVEN NA START</span></div>
+          <div class="circuit-art" aria-hidden="true">
+            <svg id="menuCircuit" viewBox="-90 -70 1310 860">
+              <path id="menuCircuitOutline" class="circuit-outline"/>
+              <path id="menuCircuitBlue" class="circuit-trace" pathLength="100"/>
+              <path id="menuCircuitRed" class="circuit-trace circuit-trace-red" pathLength="100"/>
+            </svg>
+          </div>
+          <div class="circuit-stats">
+            <div class="circuit-stat"><strong>14</strong><span>zatáček</span></div>
+            <div class="circuit-stat"><strong>1</strong><span>vítězné kolo</span></div>
+            <div class="circuit-stat"><strong id="homeDuration">500 ms</strong><span>na jeden tah</span></div>
+          </div>
+        </section>
+      </div>
+      <footer class="menu-footer"><span><i class="footer-flag" aria-hidden="true"></i>Malý okruh. Velká rivalita.</span><span>Prstem i myší. Bez instalace.</span></footer>
+    </div>
+  </main>
+
+  <section id="settingsScreen" class="screen" aria-labelledby="settingsTitle" hidden>
+    <div class="screen-inner detail-inner">
+      <button id="settingsBackBtn" class="back-button"><svg class="icon" aria-hidden="true"><use href="#icon-back"/></svg>Zpět do menu</button>
+      <header class="page-heading"><p class="eyebrow">Po tvém</p><h1 id="settingsTitle" tabindex="-1">Nastavení</h1><p>Vylaď si závod před dalším startem.</p></header>
+      <div class="settings-card">
+        <div class="setting-row">
+          <label class="setting-copy" for="difficultySetting"><strong>Obtížnost</strong><small>Vyšší obtížnost zkracuje čas na tah.</small></label>
+          <select id="difficultySetting"><option value="800">Lehká</option><option value="500" selected>Střední</option><option value="300">Těžká</option></select>
+        </div>
+        <div class="setting-row">
+          <label class="setting-copy" for="playerCountSetting"><strong>Počet hráčů</strong><small>Pro nový závod na jednom zařízení.</small></label>
+          <select id="playerCountSetting"><option value="1">1</option><option value="2" selected>2</option><option value="3">3</option><option value="4">4</option></select>
+        </div>
+        <div class="setting-row">
+          <label class="setting-copy" for="timerSetting"><strong>Odpočet u tahu</strong><small>Kroužek ukazuje zbývající čas.</small></label>
+          <label class="toggle"><input id="timerSetting" type="checkbox" checked></label>
+        </div>
+        <div class="setting-row">
+          <label class="setting-copy" for="hintSetting"><strong>Nápověda před závodem</strong><small>Krátké připomenutí pravidel při novém startu.</small></label>
+          <label class="toggle"><input id="hintSetting" type="checkbox" checked></label>
+        </div>
+      </div>
+      <div class="settings-footer"><p id="settingsStatus" class="settings-status" role="status">Nastavení se ukládá v tomto zařízení.</p><button id="defaultsBtn" class="text-button">Obnovit výchozí</button></div>
+    </div>
+  </section>
+
+  <section id="aboutScreen" class="screen" aria-labelledby="aboutTitle" hidden>
+    <div class="screen-inner detail-inner">
+      <button id="aboutBackBtn" class="back-button"><svg class="icon" aria-hidden="true"><use href="#icon-back"/></svg>Zpět do menu</button>
+      <header class="page-heading"><p class="eyebrow">Seznam se s okruhem</p><h1 id="aboutTitle" tabindex="-1">O hře</h1><p>Papírové závody pro 1 až 4 hráče. Jeden brněnský okruh.</p></header>
+      <article class="about-card">
+        <h2>Jak se závodí</h2>
+        <ol class="how-to">
+          <li><div><strong>Každý má svůj tah</strong><p>Hráči se střídají, v sólu pokračuješ po každém tahu sám. Kresli jednu rychlou čáru prstem nebo myší. První tah začíná v zeleném startovním poli, další u vlastní poslední pozice. Na tah máš <span id="aboutDuration">500 ms</span>.</p></div></li>
+          <li><div><strong>Drž se mezi obrubníky</strong><p>Náraz ukončí tah na okraji dráhy. Příště začni kdekoliv v kroužku kolem auta, klidně i za obrubníkem. Z kroužku musíš vyjet dovnitř dráhy.</p></div></li>
+          <li><div><strong>Dokonči celé kolo</strong><p>Jeď po směru šipek a projeď celý okruh. Při dojezdu mají soupeři možnost vyrovnat počet tahů. Pořadí určuje počet tahů, při shodě dojezd za cílem; úplná shoda znamená sdílené místo. Hotoví hráči už nehrají, ostatní dojíždějí o další místa. Jakmile je poslední místo jisté, zobrazí se celé pořadí.</p></div></li>
+        </ol>
+      </article>
+      <p class="about-note">Formule0 převádí klasickou hru s tužkou a papírem na společnou obrazovku. Trať je inspirovaná Automotodromem Brno a má 14 zatáček.<br><a href="https://github.com/mrtnstpnk/formule0" target="_blank" rel="noopener noreferrer">Projekt na GitHubu ↗</a></p>
+    </div>
+  </section>
+
+  <section id="raceScreen" class="race-screen" aria-label="Závod" aria-hidden="true" inert>
   <div id="topbar">
     <div id="turnIndicator">
       <div id="turnDot"></div>
-      <span id="turnLabel">Player 1</span>
+      <span class="turn-copy"><span id="turnLabel">Na tahu: Hráč 1</span><span id="raceStatus" class="race-status" role="status" hidden></span></span>
     </div>
-    <button id="restartBtn">Restart</button>
+    <div class="topbar-actions"><button id="menuBtn" class="topbar-button">Menu</button><button id="restartBtn">Restart</button></div>
   </div>
 
   <div id="canvasWrap">
-    <canvas id="track"></canvas>
+    <canvas id="track" tabindex="0" aria-label="Závodní dráha. Kresli tahy prstem nebo myší."></canvas>
   </div>
 
   <div id="hint">
-    <h2>How to Race</h2>
+    <h2>Na start, připravit…</h2>
     <p>
-      Take turns drawing <strong>one quick stroke</strong> with your finger to move your car.
-      Begin in the green grid, then start each stroke where your car stopped.
-      After a crash, touch inside the circle and leave it toward the road.
-      Stay inside the road &mdash;
-      touch a wall and you crash! Follow the arrows around Brno and complete
-      one full lap to win.
+      Každý hráč kreslí <strong>jeden rychlý tah</strong> prstem nebo myší.
+      Začni v zeleném poli. Na každý tah máš <strong id="hintDuration">500 ms</strong>.
+      Po nárazu začni uvnitř kroužku a vyjeď z něj do dráhy.
+      Dokonči celé kolo po směru šipek. Soupeři mohou vyrovnat počet tahů a dojíždějí o další místa.
+      Při shodě rozhoduje dojezd za cílem, proto za čárou pokračuj v tahu.
     </p>
-    <div class="tapHint">Tap anywhere to begin</div>
+    <button id="dismissHintBtn" class="menu-button button-primary">Rozumím, jdeme závodit</button>
   </div>
 
   <div id="flash"></div>
 
-  <div id="victory">
-    <div class="medal">&#127942;</div>
-    <h1 id="victoryText">Player 1 Wins!</h1>
-    <button id="rematchBtn">Rematch</button>
-  </div>
+  <section id="victory" aria-labelledby="victoryText" aria-live="polite">
+    <div class="result-details">
+    <div class="result-heading">
+      <span class="medal" aria-hidden="true">&#127942;</span>
+      <div><h1 id="victoryText">Hráč 1 vítězí!</h1><p id="victorySummary" class="victory-summary"></p></div>
+    </div>
+    <ol id="raceStandings" class="race-standings" aria-label="Celkové pořadí"></ol>
+    </div>
+    <div class="result-actions"><button id="rematchBtn">Odveta</button><button id="victoryMenuBtn" class="victory-menu">Zpět do menu</button></div>
+  </section>
+  </section>
 
 <script src="track/brno-circuit.js"></script>
 <script>
@@ -115,8 +199,28 @@
   // CONFIG
   // =========================================================================
   const STROKE_DURATION_MS = 500;      // how long a single turn's stroke lasts
-  const PLAYER_COLORS = ["#2563eb", "#dc2626"];   // player 1 blue, player 2 red
-  const PLAYER_NAMES = ["Player 1", "Player 2"];
+  const PLAYER_COLORS = ["#2563eb", "#dc2626", "#15803d", "#b45309"];
+  const PLAYER_NAMES = ["Hráč 1", "Hráč 2", "Hráč 3", "Hráč 4"];
+  const SETTINGS_KEY = "formule0.settings.v1";
+  const TURN_DURATIONS = [300, 500, 800];
+  const PLAYER_COUNTS = [1, 2, 3, 4];
+  const DEFAULT_SETTINGS = { strokeDurationMs: STROKE_DURATION_MS, playerCount: 2, showTimer: true, showHint: true };
+
+  function loadSettings() {
+    let saved;
+    try { saved = JSON.parse(localStorage.getItem(SETTINGS_KEY)); } catch (err) { /* storage may be unavailable */ }
+    const result = { ...DEFAULT_SETTINGS };
+    if (!saved || typeof saved !== "object") return result;
+    if (TURN_DURATIONS.includes(saved.strokeDurationMs)) result.strokeDurationMs = saved.strokeDurationMs;
+    if (PLAYER_COUNTS.includes(saved.playerCount)) result.playerCount = saved.playerCount;
+    for (const key of ["showTimer", "showHint"]) {
+      if (typeof saved[key] === "boolean") result[key] = saved[key];
+    }
+    return result;
+  }
+
+  const settings = loadSettings();
+  const app = { screen: "home", raceStarted: false };
 
   // =========================================================================
   // GAME STATE MACHINE
@@ -126,15 +230,21 @@
 
   const game = {
     state: STATE.WAITING_FOR_TOUCH,
-    currentPlayer: 0,                 // 0 or 1
-    positions: [null, null],          // {x,y} current car position, null = must start in start zone
-    nextCheckpoint: [0, 0],           // each player's progress through the ordered lap gates
+    playerCount: settings.playerCount, // fixed for the current race
+    currentPlayer: 0,
+    positions: Array(settings.playerCount).fill(null), // null = must start in start zone
+    nextCheckpoint: Array(settings.playerCount).fill(0), // progress through the ordered lap gates
+    turnsTaken: Array(settings.playerCount).fill(0),
+    finishes: Array(settings.playerCount).fill(null), // {turns, distance} in unscaled circuit units
+    finalTurn: null,                  // equal-turn deadline for the current group of finishers
+    standings: [],                    // complete classification, populated when the race ends
     strokes: [],                      // committed strokes: {player, points:[{x,y}], crashed}
-    crashMarkers: [],                 // {x,y} visual crash markers
     currentStroke: null,              // in-progress stroke: {player, points:[{x,y}]}
     strokeStartTime: 0,
+    strokeDurationMs: settings.strokeDurationMs,
     activePointerId: null,
     winner: null,
+    winners: [],
     hintDismissed: false,
   };
 
@@ -155,9 +265,108 @@
   const victoryEl = document.getElementById("victory");
   const victoryText = document.getElementById("victoryText");
   const rematchBtn = document.getElementById("rematchBtn");
+  const raceScreen = document.getElementById("raceScreen");
+  const panels = {
+    home: document.getElementById("homeScreen"),
+    settings: document.getElementById("settingsScreen"),
+    about: document.getElementById("aboutScreen"),
+  };
+
+  // =========================================================================
+  // MENUS / LOCAL SETTINGS
+  // =========================================================================
+
+  function updateHomeActions() {
+    const canResume = app.raceStarted && game.state !== STATE.GAME_OVER;
+    document.getElementById("resumeBtn").hidden = !canResume;
+    document.getElementById("playBtn").classList.toggle("is-secondary", canResume);
+  }
+
+  function showScreen(name, moveFocus = true) {
+    // Finish an interrupted stroke at its last accepted point. No timer or
+    // pointer capture remains active behind a menu.
+    if (name !== "race" && game.currentStroke) endStroke("normal");
+    app.screen = name;
+    for (const key of Object.keys(panels)) panels[key].hidden = key !== name;
+    raceScreen.setAttribute("aria-hidden", String(name !== "race"));
+    raceScreen.inert = name !== "race";
+    updateHomeActions();
+    if (!moveFocus) return;
+    if (panels[name]) panels[name].scrollTop = 0;
+    const target = name === "race" ? (game.hintDismissed ? canvas : document.getElementById("dismissHintBtn")) :
+      name === "home" ? document.getElementById(document.getElementById("resumeBtn").hidden ? "playBtn" : "resumeBtn") :
+      document.getElementById(name === "settings" ? "settingsTitle" : "aboutTitle");
+    target.focus({ preventScroll: true });
+  }
+
+  function startRace() {
+    resetGame();
+    app.raceStarted = true;
+    game.hintDismissed = !settings.showHint;
+    hintEl.hidden = game.hintDismissed;
+    showScreen("race");
+  }
+
+  function updateSettingsUI() {
+    document.getElementById("difficultySetting").value = String(settings.strokeDurationMs);
+    document.getElementById("playerCountSetting").value = String(settings.playerCount);
+    document.getElementById("homePlayersLabel").textContent = settings.playerCount +
+      (settings.playerCount === 1 ? " hráč" : " hráči") + " · 1 zařízení";
+    for (let player = 1; player <= PLAYER_COLORS.length; player++) {
+      document.getElementById("homePlayer" + player).hidden = player > settings.playerCount;
+    }
+    for (const [id, key] of [["timerSetting", "showTimer"], ["hintSetting", "showHint"]]) {
+      document.getElementById(id).checked = settings[key];
+    }
+    for (const id of ["homeDuration", "aboutDuration", "hintDuration"]) {
+      document.getElementById(id).textContent = settings.strokeDurationMs + " ms";
+    }
+  }
+
+  function saveSettings() {
+    const status = document.getElementById("settingsStatus");
+    try {
+      localStorage.setItem(SETTINGS_KEY, JSON.stringify(settings));
+      status.textContent = "Nastavení je uložené v tomto zařízení.";
+    } catch (err) {
+      status.textContent = "Nastavení platí pro toto spuštění hry.";
+    }
+    updateSettingsUI();
+  }
+
+  document.getElementById("playBtn").addEventListener("click", startRace);
+  document.getElementById("resumeBtn").addEventListener("click", () => showScreen("race"));
+  document.getElementById("settingsBtn").addEventListener("click", () => showScreen("settings"));
+  document.getElementById("aboutBtn").addEventListener("click", () => showScreen("about"));
+  for (const id of ["settingsBackBtn", "aboutBackBtn", "menuBtn", "victoryMenuBtn"]) {
+    document.getElementById(id).addEventListener("click", () => showScreen("home"));
+  }
+  document.getElementById("difficultySetting").addEventListener("change", function () {
+    const value = Number(this.value);
+    if (TURN_DURATIONS.includes(value)) settings.strokeDurationMs = value;
+    saveSettings();
+  });
+  document.getElementById("playerCountSetting").addEventListener("change", function () {
+    const value = Number(this.value);
+    if (PLAYER_COUNTS.includes(value)) settings.playerCount = value;
+    saveSettings();
+  });
+  for (const [id, key] of [["timerSetting", "showTimer"], ["hintSetting", "showHint"]]) {
+    document.getElementById(id).addEventListener("change", function () { settings[key] = this.checked; saveSettings(); });
+  }
+  document.getElementById("defaultsBtn").addEventListener("click", function () {
+    Object.assign(settings, DEFAULT_SETTINGS);
+    saveSettings();
+  });
+  document.addEventListener("keydown", function (e) {
+    if (e.key !== "Escape") return;
+    if (app.screen !== "home") showScreen("home");
+    else if (app.raceStarted && game.state !== STATE.GAME_OVER) showScreen("race");
+  });
 
   let dpr = Math.max(1, window.devicePixelRatio || 1);
   let W = 0, H = 0; // canvas CSS-pixel dimensions
+  let layoutPending = false;
 
   // =========================================================================
   // GEOMETRY HELPERS
@@ -262,6 +471,10 @@
 
   // The game and the approved design preview share these exact boundaries.
   const circuitPlan = BrnoCircuit.buildGeometry();
+  const circuitPath = circuitPlan.sections.map((s, i) => `${i === 0 ? "M" : "L"}${s.center.x.toFixed(2)},${s.center.y.toFixed(2)}`).join(" ") + " Z";
+  for (const id of ["menuCircuitOutline", "menuCircuitBlue", "menuCircuitRed"]) {
+    document.getElementById(id).setAttribute("d", circuitPath);
+  }
 
   function generateTrack(width, height) {
     const minDim = Math.min(width, height);
@@ -278,6 +491,11 @@
       return { x: width / 2 + (p.x - (minX + maxX) / 2) * scale,
         y: height / 2 + (p.y - (minY + maxY) / 2) * scale };
     }
+    function toPlan(point) {
+      const p = { x: (point.x - width / 2) / scale + (minX + maxX) / 2,
+        y: (point.y - height / 2) / scale + (minY + maxY) / 2 };
+      return portrait ? { x: p.y, y: -p.x } : p;
+    }
 
     // Put the shared start/finish at index zero, as expected by the lap logic.
     const finishSection = 12;
@@ -285,6 +503,30 @@
     const indexOf = sourceIndex => (sourceIndex - finishSection + len) % len;
     const ordered = Array.from({ length: len }, (_, i) => circuitPlan.sections[(i + finishSection) % len]);
     const centerline = ordered.map(s => ({ ...transform(s.center), w: circuitPlan.width * scale / 2 }));
+    const distances = [0];
+    for (let i = 0; i < len; i++) distances.push(distances[i] + dist(centerline[i], centerline[(i + 1) % len]) / scale);
+    const lapLength = distances[len];
+    function roadProgress(point) {
+      let nearest = Infinity, progress = 0;
+      for (let i = 0; i < len; i++) {
+        const a = centerline[i], b = centerline[(i + 1) % len];
+        const dx = b.x - a.x, dy = b.y - a.y;
+        const lengthSquared = dx * dx + dy * dy;
+        const t = lengthSquared === 0 ? 0 : clamp(((point.x - a.x) * dx + (point.y - a.y) * dy) / lengthSquared, 0, 1);
+        const distance = (point.x - a.x - t * dx) ** 2 + (point.y - a.y - t * dy) ** 2;
+        if (distance < nearest) {
+          nearest = distance;
+          progress = distances[i] + t * (distances[i + 1] - distances[i]);
+        }
+      }
+      return progress % lapLength;
+    }
+    function progressBetween(from, to) {
+      let delta = roadProgress(to) - roadProgress(from);
+      if (delta > lapLength / 2) delta -= lapLength;
+      if (delta < -lapLength / 2) delta += lapLength;
+      return delta;
+    }
     const left = ordered.map(s => transform(s.left));
     const right = ordered.map(s => transform(s.right));
     const wallSegments = [];
@@ -318,7 +560,7 @@
     const arrowIndices = [2, 10, 13, 21, 27, 33, 35, 39, 44, 48, 52, 55, 59, 63, 66]
       .map(anchor => indexOf(anchor * 12 + 4));
     return {
-      width, height, minDim, scale,
+      width, height, minDim, scale, toPlan, fromPlan: transform, progressBetween,
       centerline, left, right, wallSegments, finishSegment, checkpoints, lapGates,
       boundsSegments, startZonePolygon, finishBandPolygon, turnIndices, arrowIndices,
       collisionSegments: wallSegments.concat(boundsSegments),
@@ -461,19 +703,14 @@
       drawStroke(ctx, s, PLAYER_COLORS[s.player], strokeWidth);
     }
 
-    // crash markers
-    for (const m of game.crashMarkers) {
-      drawCrashMarker(m);
-    }
-
     // in-progress stroke
     if (game.currentStroke) {
       drawStroke(ctx, game.currentStroke, PLAYER_COLORS[game.currentStroke.player], strokeWidth);
-      drawTimeIndicator();
+      if (settings.showTimer) drawTimeIndicator();
     }
 
     // player position dots (where the next stroke must begin)
-    for (let p = 0; p < 2; p++) {
+    for (let p = 0; p < game.playerCount; p++) {
       const pos = game.positions[p];
       if (pos && !(game.currentStroke && game.currentStroke.player === p)) {
         ctx.beginPath();
@@ -485,12 +722,17 @@
         ctx.stroke();
       }
     }
+
+    // Keep the endpoint cross visible on top of the current position dot.
+    for (const stroke of game.strokes) {
+      drawTurnMarker(stroke.points[stroke.points.length - 1], PLAYER_COLORS[stroke.player]);
+    }
   }
 
-  function drawCrashMarker(pos) {
-    const s = clamp(track.minDim * 0.02, 6, 14);
+  function drawTurnMarker(pos, color) {
+    const s = clamp(track.minDim * 0.02, 6, 14) * 0.6;
     ctx.save();
-    ctx.strokeStyle = "#ef4444";
+    ctx.strokeStyle = color;
     ctx.lineWidth = 3;
     ctx.lineCap = "round";
     ctx.beginPath();
@@ -505,7 +747,7 @@
     if (!stroke || stroke.points.length === 0) return;
     const last = stroke.points[stroke.points.length - 1];
     const elapsed = performance.now() - game.strokeStartTime;
-    const remaining = clamp(1 - elapsed / STROKE_DURATION_MS, 0, 1);
+    const remaining = clamp(1 - elapsed / game.strokeDurationMs, 0, 1);
     const maxR = clamp(track.minDim * 0.05, 18, 40);
     ctx.save();
     ctx.beginPath();
@@ -528,9 +770,11 @@
   }
 
   function onPointerDown(e) {
+    if (app.screen !== "race" || layoutPending || !track) return;
     if (!game.hintDismissed) return; // hint overlay eats the very first touch
     if (game.state === STATE.GAME_OVER) return;
     if (game.state === STATE.DRAWING) return; // ignore extra fingers
+    if (game.finishes[game.currentPlayer]) return; // finished cars do not take another turn
 
     const pos = getRelativePos(e);
     const required = game.positions[game.currentPlayer];
@@ -550,6 +794,7 @@
         { center: startPoint, radius: startCircleRadius(), lastPointer: pos } : null,
     };
     game.strokeStartTime = performance.now();
+    game.strokeDurationMs = settings.strokeDurationMs;
     game.activePointerId = e.pointerId;
     try { canvas.setPointerCapture(e.pointerId); } catch (err) { /* no-op */ }
   }
@@ -577,23 +822,14 @@
 
       // Commit the local recovery only after a valid exit. Still check the
       // rest of this same pointer segment, even if its endpoint is on road.
-      const finish = advanceLap(from, exit, null);
-      stroke.points.push(finish ? { x: finish.x, y: finish.y } : exit);
-      if (finish) {
-        endStroke("win");
-        return;
-      }
+      advanceLap(from, exit, null);
+      stroke.points.push(exit);
       from = exit;
     }
     if (dist(from, pos) <= GEOMETRY_EPSILON) return;
 
     const hit = findNearestIntersection(from, pos, track.collisionSegments, track);
-    const finish = advanceLap(from, pos, hit);
-    if (finish) {
-      stroke.points.push({ x: finish.x, y: finish.y });
-      endStroke("win");
-      return;
-    }
+    advanceLap(from, pos, hit);
     if (hit) {
       stroke.points.push({ x: hit.x, y: hit.y });
       endStroke("crash");
@@ -617,12 +853,13 @@
   window.addEventListener("pointercancel", onPointerUp);
 
   // Belt-and-suspenders against page scroll/zoom/rubber-banding on iOS.
-  document.addEventListener("touchmove", function (e) { e.preventDefault(); }, { passive: false });
-  document.addEventListener("gesturestart", function (e) { e.preventDefault(); });
+  document.addEventListener("touchmove", function (e) { if (app.screen === "race") e.preventDefault(); }, { passive: false });
+  document.addEventListener("gesturestart", function (e) { if (app.screen === "race") e.preventDefault(); });
 
-  hintEl.addEventListener("pointerdown", function () {
+  document.getElementById("dismissHintBtn").addEventListener("click", function () {
     game.hintDismissed = true;
-    hintEl.style.display = "none";
+    hintEl.hidden = true;
+    canvas.focus({ preventScroll: true });
   });
 
   // =========================================================================
@@ -630,6 +867,14 @@
   // =========================================================================
 
   function advanceLap(from, to, wallHit) {
+    const player = game.currentPlayer;
+    const endpoint = wallHit || to;
+    if (game.finishes[player]) {
+      // Signed progress along the road counts forward travel and reversals,
+      // independent of screen orientation or extra sideways finger movement.
+      game.finishes[player].distance += track.progressBetween(from, endpoint);
+      return;
+    }
     const crossings = [];
     for (const gate of track.lapGates) {
       const hit = segIntersect(from, to, gate.p1, gate.p2);
@@ -638,14 +883,19 @@
       crossings.push({ ...hit, gate });
     }
     crossings.sort((a, b) => a.t - b.t);
-    const player = game.currentPlayer;
     for (const hit of crossings) {
       const gate = hit.gate;
       const forward = (to.x - from.x) * gate.forward.x + (to.y - from.y) * gate.forward.y > 0;
       if (!forward) {
         game.nextCheckpoint[player] = 0;
       } else if (gate.type === "finish") {
-        if (game.nextCheckpoint[player] === track.checkpoints.length) return hit;
+        if (game.nextCheckpoint[player] === track.checkpoints.length) {
+          const turns = game.turnsTaken[player] + 1;
+          game.finishes[player] = { turns, distance: track.progressBetween(hit, endpoint) };
+          if (game.finalTurn === null) game.finalTurn = turns;
+          updateTopBar();
+          return;
+        }
         game.nextCheckpoint[player] = 0;
       } else if (gate.checkpoint === game.nextCheckpoint[player]) {
         game.nextCheckpoint[player]++;
@@ -653,34 +903,70 @@
         game.nextCheckpoint[player] = gate.checkpoint === 0 ? 1 : 0;
       }
     }
+  }
+
+  function finishRace() {
+    const finishers = game.finishes.map((finish, player) => ({ finish, player }))
+      .filter(entry => entry.finish)
+      .sort((a, b) => a.finish.turns - b.finish.turns || b.finish.distance - a.finish.distance || a.player - b.player);
+    game.standings = [];
+    let group = null, place = 0;
+    for (let i = 0; i < finishers.length; i++) {
+      const { finish, player } = finishers[i];
+      if (!group || finish.turns !== group.turns || Math.abs(finish.distance - group.distance) > GEOMETRY_EPSILON) {
+        group = finish;
+        place = i + 1;
+      }
+      game.standings.push({ player, place, finished: true, turns: finish.turns, distance: finish.distance });
+    }
+    // At most one car is still unfinished, after its equal-turn chance.
+    // Its last place is then certain without requiring another lap attempt.
+    for (let player = 0; player < game.playerCount; player++) {
+      if (!game.finishes[player]) game.standings.push({ player, place: finishers.length + 1, finished: false, turns: game.turnsTaken[player], distance: null });
+    }
+    game.winners = game.standings.filter(entry => entry.place === 1).map(entry => entry.player);
+    game.winner = game.winners.length === 1 ? game.winners[0] : null;
+    game.currentPlayer = game.winners[0];
+    game.state = STATE.GAME_OVER;
+    showVictory(game.winners);
+    render();
+  }
+
+  function nextRacingPlayer(after, deadline = null) {
+    for (let step = 1; step <= game.playerCount; step++) {
+      const player = (after + step) % game.playerCount;
+      if (!game.finishes[player] && (deadline === null || game.turnsTaken[player] < deadline)) return player;
+    }
     return null;
   }
 
   function endStroke(reason) {
     const stroke = game.currentStroke;
+    try { canvas.releasePointerCapture(game.activePointerId); } catch (err) { /* pointer may already be released */ }
+    game.activePointerId = null;
     const lastPoint = stroke.points[stroke.points.length - 1];
+    stroke.startCircle = null; // recovery tolerance belongs only to an active stroke
     stroke.crashed = (reason === "crash");
     game.strokes.push(stroke);
     game.positions[stroke.player] = lastPoint;
-
-    if (reason === "win") {
-      game.state = STATE.GAME_OVER;
-      game.winner = stroke.player;
-      game.currentStroke = null;
-      showVictory(stroke.player);
-      render();
-      return;
-    }
+    game.turnsTaken[stroke.player]++;
 
     if (reason === "crash") {
-      game.crashMarkers.push({ x: lastPoint.x, y: lastPoint.y });
       flashScreen();
-      if (navigator.vibrate) navigator.vibrate(80);
     }
 
     game.currentStroke = null;
     game.activePointerId = null;
-    game.currentPlayer = 1 - game.currentPlayer;
+    let nextPlayer = nextRacingPlayer(stroke.player, game.finalTurn);
+    if (game.finalTurn !== null && nextPlayer === null) {
+      const unfinished = game.finishes.filter(finish => !finish).length;
+      if (unfinished <= 1) { finishRace(); return; }
+      // This equal-turn group is settled. Race on for the remaining places,
+      // keeping all earlier results and skipping cars that have finished.
+      game.finalTurn = null;
+      nextPlayer = nextRacingPlayer(stroke.player);
+    }
+    game.currentPlayer = nextPlayer;
     game.state = STATE.WAITING_FOR_TOUCH;
     updateTopBar();
   }
@@ -700,72 +986,150 @@
     const p = game.currentPlayer;
     turnDot.style.background = PLAYER_COLORS[p];
     turnDot.style.color = PLAYER_COLORS[p];
-    turnLabel.textContent = PLAYER_NAMES[p] + "'s turn";
+    turnLabel.textContent = "Na tahu: " + PLAYER_NAMES[p];
+    const status = document.getElementById("raceStatus");
+    status.hidden = !game.finishes.some(Boolean);
+    status.textContent = game.finishes[p] ? "Dojezd za cíl" :
+      game.finalTurn !== null ? "Vyrovnávací tah" : "Závod o další místa";
   }
 
-  function showVictory(player) {
-    turnDot.style.background = PLAYER_COLORS[player];
-    turnDot.style.color = PLAYER_COLORS[player];
-    turnLabel.textContent = PLAYER_NAMES[player] + " wins!";
-    victoryText.textContent = PLAYER_NAMES[player] + " Wins!";
-    victoryText.style.color = PLAYER_COLORS[player];
+  function showVictory(winners) {
+    const tied = winners.length > 1;
+    const color = tied ? "#e2e8f0" : PLAYER_COLORS[winners[0]];
+    turnDot.style.background = color;
+    turnDot.style.color = color;
+    const title = tied ? "Remíza!" : PLAYER_NAMES[winners[0]] + " vítězí!";
+    turnLabel.textContent = title;
+    victoryText.textContent = title;
+    victoryText.style.color = tied ? "#0f172a" : color;
+    document.getElementById("raceStatus").hidden = true;
+    document.getElementById("victorySummary").textContent = tied ? "Sdílené první místo" : "Celkové pořadí závodu";
+    const list = document.getElementById("raceStandings");
+    list.replaceChildren();
+    for (const entry of game.standings) {
+      const row = document.createElement("li");
+      row.className = "standing-row";
+      const rank = document.createElement("span");
+      rank.className = "standing-place";
+      rank.textContent = entry.place + ".";
+      const dot = document.createElement("span");
+      dot.className = "standing-dot";
+      dot.style.background = PLAYER_COLORS[entry.player];
+      dot.setAttribute("aria-hidden", "true");
+      const copy = document.createElement("span");
+      copy.className = "standing-copy";
+      const name = document.createElement("strong");
+      name.textContent = PLAYER_NAMES[entry.player];
+      const detail = document.createElement("span");
+      detail.className = "standing-detail";
+      detail.textContent = entry.finished ? entry.turns + (entry.turns === 1 ? " tah" : entry.turns < 5 ? " tahy" : " tahů") : "Nedojel";
+      if (!entry.finished) detail.title = "Poslední místo je již jisté.";
+      copy.append(name, detail);
+      row.append(rank, dot, copy);
+      list.append(row);
+    }
     victoryEl.classList.add("show");
+    raceScreen.classList.add("results-visible");
+    resize(); // reserve space for the result without covering or dimming the road
   }
 
   function resetGame() {
     game.state = STATE.WAITING_FOR_TOUCH;
+    game.playerCount = settings.playerCount;
     game.currentPlayer = 0;
-    game.positions = [null, null];
-    game.nextCheckpoint = [0, 0];
+    game.positions = Array(game.playerCount).fill(null);
+    game.nextCheckpoint = Array(game.playerCount).fill(0);
+    game.turnsTaken = Array(game.playerCount).fill(0);
+    game.finishes = Array(game.playerCount).fill(null);
+    game.finalTurn = null;
+    game.standings = [];
     game.strokes = [];
-    game.crashMarkers = [];
     game.currentStroke = null;
     game.activePointerId = null;
     game.winner = null;
+    game.winners = [];
     victoryEl.classList.remove("show");
+    raceScreen.classList.remove("results-visible");
     flashEl.classList.remove("active", "fading");
+    resize(); // restore the full race area after removing the result panel
     updateTopBar();
     render();
   }
 
-  restartBtn.addEventListener("pointerdown", function (e) { e.stopPropagation(); resetGame(); });
-  rematchBtn.addEventListener("pointerdown", function (e) { e.stopPropagation(); resetGame(); });
+  restartBtn.addEventListener("click", startRace);
+  rematchBtn.addEventListener("click", startRace);
 
   // =========================================================================
   // INIT / RESIZE / MAIN LOOP
   // =========================================================================
 
   function resize() {
-    dpr = Math.max(1, window.devicePixelRatio || 1);
     const rect = canvasWrap.getBoundingClientRect();
+    // Some browsers briefly report a zero-sized viewport during rotation.
+    // Keep the last valid geometry until the next usable resize event.
+    if (rect.width <= 0 || rect.height <= 0) return;
+    const nextDpr = Math.max(1, window.devicePixelRatio || 1);
+    if (track && rect.width === W && rect.height === H && nextDpr === dpr) {
+      layoutPending = false;
+      return;
+    }
+    if (game.currentStroke) endStroke("normal");
+
+    const previousTrack = track;
+    dpr = nextDpr;
     W = rect.width; H = rect.height;
     canvas.width = Math.round(W * dpr);
     canvas.height = Math.round(H * dpr);
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
 
     track = generateTrack(W, H);
+    if (previousTrack) {
+      // Pass through the unscaled circuit plan so rotation, scaling and
+      // translation preserve the exact place on the road. Reuse projected
+      // objects where a car position is also the endpoint of its last stroke.
+      const projected = new Map();
+      const project = point => {
+        if (point === null) return null;
+        if (!projected.has(point)) projected.set(point, track.fromPlan(previousTrack.toPlan(point)));
+        return projected.get(point);
+      };
+      game.positions = game.positions.map(project);
+      for (const stroke of game.strokes) stroke.points = stroke.points.map(project);
+    }
+    layoutPending = false;
     buildStaticLayer();
-    resetGame(); // geometry changed (e.g. rotation) -- restart for a consistent state
+    if (!previousTrack) resetGame();
+    else render();
   }
 
   let resizeTimer = null;
-  window.addEventListener("resize", function () {
+  function scheduleResize() {
+    const rect = canvasWrap.getBoundingClientRect();
+    if (!layoutPending && rect.width === W && rect.height === H &&
+        Math.max(1, window.devicePixelRatio || 1) === dpr) return;
+    if (game.currentStroke) endStroke("normal");
+    // Ignore new strokes while CSS dimensions and the circuit geometry
+    // differ during the resize debounce interval.
+    layoutPending = true;
     clearTimeout(resizeTimer);
     resizeTimer = setTimeout(resize, 150);
-  });
+  }
+  window.addEventListener("resize", scheduleResize);
 
   function loop() {
-    if (game.state === STATE.DRAWING) {
+    if (app.screen === "race" && !layoutPending && game.state === STATE.DRAWING) {
       const elapsed = performance.now() - game.strokeStartTime;
-      if (elapsed >= STROKE_DURATION_MS) {
+      if (elapsed >= game.strokeDurationMs) {
         endStroke("normal"); // time's up -- stroke ends where the finger currently is
       }
     }
-    render();
+    if (app.screen === "race" && !layoutPending) render();
     requestAnimationFrame(loop);
   }
 
   resize();
+  updateSettingsUI();
+  showScreen("home", false);
   updateTopBar();
   requestAnimationFrame(loop);
 })();

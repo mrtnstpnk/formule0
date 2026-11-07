@@ -1,13 +1,37 @@
 # Formule
 
-A two-player pen-and-paper racing game, playable hot-seat on one phone or
-tablet. Based on the classic paper game where each player draws one quick
+A pen-and-paper racing game for 1–4 players on one phone or tablet,
+played solo or hot-seat. Based on the classic paper game where each player draws one quick
 stroke per turn to move their car around a closed circuit shaped like the
 modern Automotodrom Brno. Cross a wall and you crash; complete one clockwise
-lap and cross the finish line first to win.
+lap in the fewest turns to win, with an equal-turn final chance for later starters.
 
-Buildless browser game: `index.html` with inline CSS/JS, HTML5 canvas, and
+Buildless browser game: `index.html`, `menu.css`, HTML5 canvas, and
 shared circuit geometry in `track/brno-circuit.js`. No frameworks or build step.
+
+## Main menu and settings
+
+The Czech-language home screen opens before the race. Choose **Nový závod**
+to start, **Nastavení** to adjust the game, or **O hře** for rules and game
+information. The home screen previews the same Brno circuit used in the race.
+
+Settings include difficulty (**Lehká**: 800 ms, **Střední**: 500 ms,
+**Těžká**: 300 ms per turn), player count (1–4), the visual countdown and the
+pre-race hint. The defaults are **Střední** (500 ms) and two players.
+Player count applies to a new race; changing it does not alter a race that
+is already in progress. Each player has a separate color and lap progress.
+In solo mode, every turn belongs to the same player until the lap is complete.
+Changes save automatically in this browser, with an **Obnovit výchozí**
+button to restore defaults. If browser storage is unavailable, settings
+still work for the current session.
+
+During a race, **Menu** returns home and **Pokračovat v závodě** resumes it.
+Opening the menu during a stroke commits that stroke at its last accepted
+point and ends the turn; the timer does not run behind the menu. **Nový závod**
+and **Restart** clear the race. Escape returns to the menu or resumes a race
+from home. Rotating or resizing preserves car positions, stroke history,
+end-of-turn crosses and lap progress. An active stroke ends at its last accepted
+point before the geometry changes; the race then continues in the new layout.
 
 ## How to play
 
@@ -15,7 +39,7 @@ shared circuit geometry in `track/brno-circuit.js`. No frameworks or build step.
   finger (or mouse) to move your car.
 - Touch inside the circle around your car to start a stroke — the very
   first stroke of the game may start anywhere in the green start zone.
-- The stroke lasts about 0.5 seconds; a shrinking ring shows how much time
+- By default a stroke lasts 0.5 seconds; a shrinking ring shows how much time
   is left. Going fast covers more ground but is riskier.
 - Touch a wall and you crash: the stroke is cut at the point of impact and
   the turn passes to the other player. Your next stroke starts from the
@@ -28,11 +52,30 @@ shared circuit geometry in `track/brno-circuit.js`. No frameworks or build step.
   exit, including within the same fast movement. Releasing or running out
   of time inside the circle leaves the car in place.
 - Stay inside the track and the turn simply passes after your stroke ends.
+- Every stroke ends with a cross in that player's color, whether it stops
+  inside the road or at a collision. Each diagonal is 60% of the original
+  crash marker's length; crosses remain in place as part of the stroke history.
 - Follow the arrows clockwise around the entire circuit. The green start
   zone sits just before the shared start/finish line. Crossing it at the
   beginning does not win; you must complete a full lap first.
-- First player to finish the lap wins. Going backwards across a lap gate
-  clears lap progress. Tap **Rematch** to play again.
+- Every completed lap opens an equal-turn phase for players still racing.
+  Players with fewer turns get a chance to match the finisher's turn count.
+  Once that phase is settled, finished players stop taking turns and the
+  remaining players race on for the lower places.
+- Crossing the finish does not end the stroke. Among finishers with the same
+  turn count, the furthest final position along the road beyond the finish wins.
+  Sideways movement adds no distance, reversing reduces it, and collisions
+  still stop the stroke. Fewer turns always rank ahead of a longer finish distance
+  on more turns. Equal turn counts and distances share a place (1, 1, 3).
+- The race ends once everyone has finished, or only one unfinished player
+  remains after the equal-turn chance. That player receives the last place
+  without needing to finish. The result lists all players, their places and
+  turn counts, and marks an unfinished last player as **Nedojel**.
+- Going backwards across a lap gate before finishing clears lap progress.
+  Tap **Odveta** to play again.
+- The result appears beside the track in landscape or below it in portrait.
+  The road remains fully visible at normal brightness, including the final
+  strokes and car positions; the result panel has its own space.
 
 ## Running locally
 
@@ -58,6 +101,8 @@ collisions, touch tolerance and recovery after a crash, shortcuts, closed-wall
 geometry, and complete laps in portrait and landscape layouts. They also verify that the playable
 walls exactly match the approved preview and that each lap gate has only one
 crossing of the circuit. No dependencies are required.
+They also verify menu input isolation, race continuation, configurable turn
+deadlines, new-race behavior and validation of saved settings.
 
 ## Brno circuit
 
@@ -94,7 +139,7 @@ To enable it on GitHub:
   Rendering and collisions use its exact closed wall polygons, with a green
   grid and shared start/finish stripe. The infield stays outside the road.
 - **Rendering** — a pre-rendered static track layer plus per-frame
-  strokes, crash markers, and the stroke time indicator.
+  strokes, end-of-turn crosses, and the stroke time indicator.
 - **Input handling** — Pointer Events unify touch and mouse.
 - **Game logic** — turn handling, crash detection, three ordered directional
   checkpoints per player, full-lap finish detection, and reset/rematch.
